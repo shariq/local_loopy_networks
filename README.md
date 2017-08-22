@@ -1,5 +1,5 @@
-# loopy_networks
-#### goal: best some significant state of the art metric in 4 months
+# large_loopy_networks
+#### goal: best some significant state of the art metric in 4 months (probably language modeling)
 
 ## Overview
 
@@ -34,9 +34,12 @@ last class of model before computers get way better at thinking about thinking
 than us. and i think once we have good many-loop local learning models, we can
 start setting up really interesting problems like automated theorem proving as
 a game played between agents without having to hardcode almost any of the agent.
+
 and then from there we can start working towards AI which does science and
 engineering, and build the most empowering/valuable/destructive technology
-available to humanity.
+available to humanity! hopefully in a way which results in humanity prospering,
+the end of disease, the end of death, exploration of the galaxy(s), and a large
+amount of meaning and regret minimization for all individuals
 
 
 ## Plan of attack
@@ -98,7 +101,17 @@ so we will fine-tune hyper parameters as we increase scale of network + compute
 ## Technical details
 
 initially we are just trying to get this to work, and don't care about running
-fast or with low memory footprint. so it'll all be written in python.
+fast or with low memory footprint. so it'll all be written in nice clean python.
 
 i'll make a framework in python for loopy networks and attaching learning rules
 to them, and attaching input/output, and running train + test
+
+another set of code to run a lot of different tests on these models, for
+filtering on learning rules
+
+
+## Author
+
+the current sole contributor to this work is Shariq Hashme:
+
+https://shar.iq/
