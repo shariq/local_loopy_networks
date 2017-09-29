@@ -1,5 +1,5 @@
 # Large Loopy Networks
-###### goal: beat some significant state of the art metric in 4 months (probably language modeling) using a large "loopy" network
+###### goal: beat some significant state of the art metric in 4 months using a large "loopy" network
 
 ## Overview
 
@@ -42,76 +42,6 @@ the end of disease, the end of death, exploration of the galaxy(s), and a large
 amount of meaning and regret minimization for all individuals
 
 
-## Plan of attack
-
-eventually i think something like this would make a lot of sense in RL,
-unsupervised learning, supervised learning, and generally arbitrary learning
-problems; where it'll be just a single model we use for all of these
-
-but to start i'm tentatively interested in applying this to language modeling,
-and other sequence prediction tasks.
-
-so my goal is to have a state of the art language model within 4 months.
-
-i think scott will be interested in this problem (biologically plausible
-learning) and i'll try to collab with him to run on CUDA. probably will take a
-month.
-
-how input/output happens:
-because we want the loopy network to compute for arbitrary amounts of time,
-the output nodes will be a one hot encoding of all characters + a node to
-determine when to read the output (read the output on this node switching from
-low to high)
-during training, when the network indicates it has output a character, we feed
-another character in on the next time step, for one time step, and the output
-nodes get an error signal
-the input to the network is also one hot encoded
-
-i want to parametrize the model class of loopy networks for seq2seq.
-
-all loopy networks must support being initialized with:
-- arbitrary number of hidden state nodes
-- arbitrary number of input nodes
-- arbitrary number of output nodes
-
-some ideas for parameters:
-- connectivity rule (how the graph gets connected initially)
-- degree of connectivity
-- learning rate
-- the learning rule, and its parameters (number of channels per edge, ...)
-
-then, the super interesting bit will be to come up with a bunch of tests.
-these tests will be used to sweep the parameter space.
-they're pretty fast to run but test different kinds of things.
-some ideas for tests:
-- just memorizing longer and longer random sequences
-- make a small random circuit which generates a sequence
-- explicitly test for long term learning - e.g, 0,0,0,....,1
-- robustness of the network to being fed garbage, in different forms
-- robustness of the network to randomly perturbed weights
-- robustness of the network to randomly removed edges/nodes
-- no catastrophic forgetting - so train on X then Y, then test X
-- transfer learning - learn circuit X, see if you can fine tune to X + delta
-- compositional learning - learn A, B, C, ... Z circuits, then learn composition
-
-we don't expect all hyper parameters to try and be scale invariant
-so we will fine-tune hyper parameters as we increase scale of network + compute
-
-
-## Technical details
-
-initially we are just trying to get this to work, and don't care about running
-fast or with low memory footprint. so it'll all be written in nice clean python.
-
-i'll make a framework in python for loopy networks and attaching learning rules
-to them, and attaching input/output, and running train + test
-
-another set of code to run a lot of different tests on these models, for
-filtering on learning rules
-
-
 ## Author
 
-the current sole contributor to this work is Shariq Hashme:
-
-https://shar.iq/
+Shariq Hashme
