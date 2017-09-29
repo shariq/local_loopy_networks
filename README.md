@@ -1,5 +1,5 @@
-# Large Loopy Networks
-###### goal: beat some significant state of the art metric in 4 months using a large "loopy" network
+# Local Loopy Networks
+###### goal: beat some significant state of the art metric in 4 months using a local "loopy" network
 
 ## Overview
 
