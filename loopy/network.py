@@ -8,4 +8,6 @@ import logging
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
-# takes in a spec and dumps 
+class Network:
+    def __init__(self):
+        pass
