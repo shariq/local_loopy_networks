@@ -9,3 +9,10 @@ import loopy
 import logging
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
+
+
+'''
+take in a rule
+run some tests on the rule (where in the future, tests running depends on previous tests)
+print the results of the tests to the command line
+'''
