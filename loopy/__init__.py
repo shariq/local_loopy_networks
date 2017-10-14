@@ -1,1 +1,10 @@
-loops = 10000
+from loopy.network import Network
+import sys
+
+import logging
+logger = logging.getLogger()
+handler = logging.StreamHandler(sys.stdout)
+handler.setLevel(logging.DEBUG)
+formatter = logging.Formatter("[%(asctime)s.%(msecs)03d] %(message)s", "%H:%M:%S")
+handler.setFormatter(formatter)
+logger.addHandler(handler)

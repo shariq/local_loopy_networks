@@ -9,16 +9,6 @@ logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
 
-def reverse_adjacency_dict(adjacency_dict):
-    reversed_adjacency_dict = defaultdict(lambda: set())
-    for key, value in adjacency_dict.items():
-        for element in value:
-            reversed_adjacency_dict[element].add(key)
-            if element == key:
-                raise Exception("networks with self connected nodes unsupported")
-    return dict(reversed_adjacency_dict)
-
-
 def undirect_adjacency_dict(adjacency_dict):
     undirected_adjacency_dict = defaultdict(lambda: set())
     for key, value in adjacency_dict.items():
@@ -27,83 +17,85 @@ def undirect_adjacency_dict(adjacency_dict):
             undirected_adjacency_dict[key].add(element)
             if element == key:
                 raise Exception("networks with self connected nodes unsupported")
+    for key, value in adjacency_dict.items():
+        adjacency_dict[key] = sorted(list(value))
+        # make it easier to lay out memory correctly
     return dict(undirected_adjacency_dict)
 
 
 class Network:
-    def __init__(self, in_adjacency_dict, node_memory_size=1, edge_memory_size=2):
-        # in_adjacency_dict nodes have no self loops and not more than one edge per pair of nodes
-        # and make sure to include an empty set if that node has no edges
+    def __init__(self, in_adjacency_dict, node_memory_size=1, edge_memory_size=1):
+        # in_adjacency_dict may or may not be directed; we'll fix it right up to be undirected :]
         self.node_memory_size = node_memory_size
         self.edge_memory_size = edge_memory_size
 
-        self.in_adjacency_dict = in_adjacency_dict
-        self.out_adjacency_dict = reverse_adjacency_dict(in_adjacency_dict)
-        self.undirected_adjacency_dict = undirect_adjacency_dict(in_adjacency_dict)
+        # node => set(neighbors)
+        self.adjacency_dict = undirect_adjacency_dict(in_adjacency_dict)
 
-        self.in_adjacency_size = dict([(key, len(value)) for key, value in in_adjacency_dict.items()])
-        self.out_adjacency_size = dict([key, len(value) for key, value in out_adjacency_dict.items()])
-        self.undirected_adjacency_size = dict([key, len(value) for key, value in undirected_adjacency_dict.items()])
+        # node => sorted_list(neighbors)
+        self.sorted_adjacency_dict = dict([(key, sorted(list(value))) for key, value in self.adjacency_dict.items()])
 
-        self.nodes = sorted(list(self.undirected_adjacency_dict.keys()))
+        # meaning a mapping from node to number of edges
+        self.adjacency_size = dict([(key, len(value)) for key, value in self.adjacency_dict.items()])
 
-        '''
-        # in_adjacency_dict is a dict like this
-        {
-            node_1: set([
-                adjacent_1,
-                adjacent_2,
-                ...
-            ]),
-            node_2: ...
-        ...
-        }
+        self.nodes = sorted(list(self.adjacency_dict.keys()))
 
-        # out_adjacency_dict is the same, but in the reverse direction
-        # since the network is directed
+        assert set(self.nodes) == set(range(len(self.nodes)))
+        # for now nodes are just ints which go from 0 to len(graph) - 1
 
-        # undirected_adjacency_dict contains neighbors for all nodes (in + out)
-        '''
+        buffer_size = lambda node: node_memory_size + edge_memory_size * self.adjacency_size[node]
 
-        def read_buffer_size(node):
-            in_edges = self.in_adjacency_size[node]
-            out_edges = self.out_adjacency_size[node]
-            total_edges = in_edges + out_edges
+        self.read_buffer = [np.zeros(buffer_size(node)) for node in self.nodes]
+        self.write_buffer = [np.zeros(buffer_size(node)) for node in self.nodes]
 
-            local_node_memory_size = node_memory_size * (total_edges)
-            local_edge_memory_size = edge_memory_size * (in_edges)
-            return local_edge_memory_size + local_node_memory_size
+        # buffer LAYOUT:
+        # [node_memory, edge_memory]
 
-        def write_buffer_size(node):
-            in_edges = self.in_adjacency_size[node]
-            out_edges = self.out_adjacency_size[node]
-            total_edges = in_edges + out_edges
+        # edge_memory LAYOUT:
+        # for adjacent node in smallest to biggest;
+        # [edge_memory_node, edge_memory_node, ...]
 
-            local_node_memory_size = node_memory_size * 1
-            local_edge_memory_size = edge_memory_size * (out_edges)
-            return local_edge_memory_size + local_node_memory_size
+        # when we call it a read buffer or a write buffer, that refers to
+        # whether the update rule is reading/writing to it. code here
+        # still has to move data around between these buffers
 
-        self.read_buffers = [
-            [np.zeros(read_buffer_size(node) for node in self.nodes],
-            [np.zeros(read_buffer_size(node) for node in self.nodes],
-        ]
-
-        self.write_buffers = [
-            [np.zeros(write_buffer_size(node) for node in self.nodes],
-            [np.zeros(write_buffer_size(node) for node in self.nodes],
-        ]
-        # like a 2 element ring buffer
-
-        self.writing_to_first_buffer = True
-        # True / False to switch between buffers
 
     def initialize(self, initialize_rule):
+
+        read_buffer = self.read_buffer
+
         for node in self.nodes:
-            out_edges = self.out_adjacency_size[node]
-            in_edges = self.in_adjacency_size[node]
-            self.local_buffers[0][node][:] = initialize_rule(in_edges=in_edges, out_edges=out_edges)
-            self.local_buffers[1][node][:] = self.local_buffers[0][node][:]
+            edges = self.adjacency_size[node]
+            read_buffer[node][:] = initialize_rule(node_memory_size=self.node_memory_size, edge_memory_size=self.edge_memory_size, edges=edges)
+
+
+    def _resolve_write_to_read(self):
+        # in this method, we are moving data from the write buffer to the read buffer
+        # which is the opposite of what is done in the update rule: where write = f(read)
+        # because the edges can have conflicting values, we resolve conflicts by adding values together
+        # it maybe makes more sense to multiply the values together instead
+
+        read_buffer = self.read_buffer
+        write_buffer = self.write_buffer
+
+        for node in self.nodes:
+            read_buffer[node][:] = write_buffer[node]
+            # first let's set this node's own memory to the right thing
+            # and initialize the edge memory to something reasonable
+
+        for node in self.nodes:
+            for i, adjacent_node in enumerate(self.sorted_adjacency_dict[node]):
+                read_start = self.node_memory_size + i * self.edge_memory_size
+                write_start = self.node_memory_size + self.sorted_adjacency_dict[adjacent_node].index(node) * self.edge_memory_size
+                read_buffer[node][read_start:read_start + self.edge_memory_size] += write_buffer[adjacent_node][write_start:write_start + self.edge_memory_size]
+
 
     def update(self, update_rule):
-        
+        read_buffer = self.read_buffer
+        write_buffer = self.write_buffer
+
         for node in self.nodes:
+            edges = self.adjacency_size[node]
+            update_rule(node_read_buffer=read_buffer[node], node_write_buffer=write_buffer[node], node_memory_size=self.node_memory_size, edge_memory_size=self.edge_memory_size, edges=edges)
+
+        self._resolve_write_to_read()
