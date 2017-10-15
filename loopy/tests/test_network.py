@@ -1,18 +1,33 @@
-import loopy
 import unittest
 import numpy as np
 import random
 import argparse
+import time
 
 import logging
 logger = logging.getLogger()
 
-Network = loopy.Network
+from loopy import Network
 # Network(in_adjacency_dict, node_memory_size=1, edge_memory_size=2)
+from loopy.waxman_graph import directed_waxman_graph
+# directed_waxman_graph(n, alpha=0.4, beta=0.1, domain_scale=1.0, dimensionality=3)
 
-loop_adjacency_dict = {}
-for i in range(10):
-    loop_adjacency_dict[i] = set([(i+1) % 10])
+def make_loop_adjacency_dict(size=10):
+    loop_adjacency_dict = {}
+    for i in range(size):
+        loop_adjacency_dict[i] = set([(i+1) % size])
+    return loop_adjacency_dict
+
+def make_waxman_adjacency_dict(size):
+    if size > 1000:
+        logger.warn('WARNING: this waxman_graph is really big and may take way too long with our implementation')
+    if size >= 300:
+        alpha, beta = 0.2, 0.5
+    elif size >= 50:
+        alpha, beta = 0.8, 0.6
+    else:
+        alpha, beta = 1.0, 1.0
+    return directed_waxman_graph(size, alpha=alpha, beta=beta)
 
 def basic_initialize_rule(node_memory_size, edge_memory_size, edges):
     return np.zeros(node_memory_size + edge_memory_size * edges)
@@ -61,14 +76,14 @@ def log_buffers(message, network):
 
 class TestNetwork(unittest.TestCase):
     def test_init(self):
-        Network(in_adjacency_dict=loop_adjacency_dict)
+        Network(in_adjacency_dict=make_loop_adjacency_dict())
 
     def test_initialize(self):
-        network = Network(in_adjacency_dict=loop_adjacency_dict)
+        network = Network(in_adjacency_dict=make_loop_adjacency_dict(), node_memory_size=1, edge_memory_size=1)
         network.initialize(initialize_rule=basic_initialize_rule)
 
     def test_update(self):
-        network = Network(in_adjacency_dict=loop_adjacency_dict)
+        network = Network(in_adjacency_dict=make_loop_adjacency_dict(), node_memory_size=1, edge_memory_size=1)
         network.initialize(initialize_rule=basic_initialize_rule)
         logger.debug('\n=> test_update <=')
         log_buffers('initialized...', network)
@@ -80,7 +95,7 @@ class TestNetwork(unittest.TestCase):
         log_buffers('network.update', network)
 
     def test_multiple_updates(self):
-        network = Network(in_adjacency_dict=loop_adjacency_dict)
+        network = Network(in_adjacency_dict=make_loop_adjacency_dict(), node_memory_size=1, edge_memory_size=1)
         network.initialize(initialize_rule=basic_initialize_rule)
         logger.debug('\n=> test_multiple_updates <=')
         network.write_buffer[0] = np.array([1.0, 1.0, -1.0])
@@ -110,6 +125,51 @@ class TestNetwork(unittest.TestCase):
         basic_update_rule(node_read_buffer=node_read_buffer, node_write_buffer=node_write_buffer, node_memory_size=node_memory_size, edge_memory_size=edge_memory_size, edges=edges)
         self.assertSequenceEqual(node_write_buffer.tolist(), expected_write_buffer.tolist())
 
+    def test_large_loop_multiple_updates(self):
+        network = Network(in_adjacency_dict=make_loop_adjacency_dict(10000), node_memory_size=5, edge_memory_size=5)
+        logger.debug('\n=> test_large_loop_multiple_updates <=')
+        start = time.time()
+        network.initialize(initialize_rule=basic_initialize_rule)
+        logger.debug('network.initialize took {}'.format(time.time() - start))
+        start = time.time()
+        network.update(update_rule=basic_update_rule)
+        logger.debug('network.update took {}'.format(time.time() - start))
+        start = time.time()
+        network.update(update_rule=basic_update_rule)
+        logger.debug('network.update took {}'.format(time.time() - start))
+        start = time.time()
+        network.update(update_rule=basic_update_rule)
+        logger.debug('network.update took {}'.format(time.time() - start))
+        start = time.time()
+        network.update(update_rule=basic_update_rule)
+        logger.debug('network.update took {}'.format(time.time() - start))
+        start = time.time()
+        network.update(update_rule=basic_update_rule)
+        logger.debug('network.update took {}'.format(time.time() - start))
+
+    def test_large_waxman_multiple_updates(self):
+        logger.debug('\n=> test_large_waxman_multiple_updates <=')
+        start = time.time()
+        network = Network(in_adjacency_dict=make_waxman_adjacency_dict(1000), node_memory_size=5, edge_memory_size=5)
+        logger.debug('Network() took {}'.format(time.time() - start))
+        start = time.time()
+        network.initialize(initialize_rule=basic_initialize_rule)
+        logger.debug('network.initialize took {}'.format(time.time() - start))
+        start = time.time()
+        network.update(update_rule=basic_update_rule)
+        logger.debug('network.update took {}'.format(time.time() - start))
+        start = time.time()
+        network.update(update_rule=basic_update_rule)
+        logger.debug('network.update took {}'.format(time.time() - start))
+        start = time.time()
+        network.update(update_rule=basic_update_rule)
+        logger.debug('network.update took {}'.format(time.time() - start))
+        start = time.time()
+        network.update(update_rule=basic_update_rule)
+        logger.debug('network.update took {}'.format(time.time() - start))
+        start = time.time()
+        network.update(update_rule=basic_update_rule)
+        logger.debug('network.update took {}'.format(time.time() - start))
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Run unit tests.')
