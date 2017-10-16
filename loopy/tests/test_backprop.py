@@ -30,6 +30,7 @@ class TestBackprop(unittest.TestCase):
             expected_c = model.forward([a, b])[0]
             self.assertEqual(c, expected_c)
 
+
     def test_train_add(self):
         train_dataset = [
             ([0, 0] , [0]),
@@ -37,7 +38,7 @@ class TestBackprop(unittest.TestCase):
             ([1, 0] , [1]),
             ([1, 1] , [2]),
         ]
-        iterations = 100
+        iterations = 1000
         model = BackpropModel(input_size=2, hidden_size=1, output_size=1)
         model.train(dataset=train_dataset, iterations=iterations)
 

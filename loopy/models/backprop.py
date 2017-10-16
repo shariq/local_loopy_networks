@@ -42,7 +42,10 @@ def backprop_initialize_rule(node_memory_size, edge_memory_size, edges):
 
 
 LEAKY_RELU_LEFT_SIDE_COEFFICIENT = 0.1
-LEARNING_RATE = 1e-3
+LEARNING_RATE = 0.03
+# double this to make it equivalent to the same learning rule in regular backprop
+# because of weird edge conflict write resolution rule
+
 def backprop_step_rule(node_read_buffer, node_write_buffer, node_memory_size, edge_memory_size, edges):
     node_write_buffer[:] = node_read_buffer
 
@@ -65,39 +68,79 @@ def backprop_step_rule(node_read_buffer, node_write_buffer, node_memory_size, ed
             node_signal = LEAKY_RELU_LEFT_SIDE_COEFFICIENT * node_signal
 
         for neighbor in range(edges):
-            edge_memory = node_read_buffer[node_memory_size + neighbor * edge_memory_size:node_memory_size + (neighbor + 1) * edge_memory_size]
-            if edge_memory[EDGE_HAS_SIGNAL_INDEX] != 0:
+            edge_memory_start_index = node_memory_size + neighbor * edge_memory_size
+            edge_memory_end_index = edge_memory_start_index + edge_memory_size
+            if node_read_buffer[edge_memory_start_index + EDGE_HAS_SIGNAL_INDEX] != 0:
                 # this edge has a signal
-                edge_memory[EDGE_HAS_SIGNAL_INDEX] = 0
+                node_write_buffer[edge_memory_start_index + EDGE_SIGNAL_INDEX] = 0
+                node_write_buffer[edge_memory_start_index + EDGE_HAS_SIGNAL_INDEX] = 0
             else:
-                # this edge does not have a signal
-                edge_memory[EDGE_SIGNAL_INDEX] = node_signal
-                edge_memory[EDGE_HAS_SIGNAL_INDEX] = 1
+                # this edge has a signal
+                node_write_buffer[edge_memory_start_index + EDGE_SIGNAL_INDEX] = node_signal * 2
+                # node_signal*2 is a weird requirement due to undirected graph having edge write conflicts
+                node_write_buffer[edge_memory_start_index + EDGE_HAS_SIGNAL_INDEX] = 2
 
         node_write_buffer[NODE_SIGNAL_MEMORY_INDEX] = node_signal
         node_write_buffer[NODE_SIGNAL_JUST_SENT_INDEX] = 1
         return
 
-    if node_read_buffer[NODE_SIGNAL_JUST_SENT_INDEX] == 1:
+    if node_read_buffer[NODE_SIGNAL_JUST_SENT_INDEX] != 0:
         # trigger if we sent a signal last step
         # part of forward pass
+
+        # not sending a signal this step
         node_write_buffer[NODE_SIGNAL_JUST_SENT_INDEX] = 0
+        # if we sent a signal last step, get rid of all signals and has_signals which touch us
         node_write_buffer[node_memory_size + EDGE_SIGNAL_INDEX::edge_memory_size] = 0
         node_write_buffer[node_memory_size + EDGE_HAS_SIGNAL_INDEX::edge_memory_size] = 0
         return
 
-    if (node_read_buffer[node_memory_size + EDGE_HAS_ERROR_INDEX::edge_memory_size] != 0).any():
+
+    if node_read_buffer[NODE_ERROR_JUST_SENT_INDEX] == 0 and (node_read_buffer[node_memory_size + EDGE_HAS_ERROR_INDEX::edge_memory_size] != 0).any():
         # trigger on any incoming errors
         # part of backward pass
 
         actual_signal = node_read_buffer[NODE_SIGNAL_MEMORY_INDEX]
         if actual_signal < 0.0:
-            gradient = LEAKY_RELU_LEFT_SIDE_COEFFICIENT
+            derivative = LEAKY_RELU_LEFT_SIDE_COEFFICIENT
         else:
-            gradient = 1.0
+            derivative = 1.0
 
-        pass
+        total_incoming_gradient = 0.0
+        for neighbor in range(edges):
+            edge_memory_start_index = node_memory_size + neighbor * edge_memory_size
+            if node_read_buffer[edge_memory_start_index + EDGE_HAS_ERROR_INDEX] != 0:
+                # has an error on it
+                total_incoming_gradient += node_read_buffer[edge_memory_start_index + EDGE_WEIGHT_INDEX] * node_read_buffer[edge_memory_start_index + EDGE_ERROR_INDEX]
+            else:
+                pass
 
+        error = total_incoming_gradient * derivative
+
+        for neighbor in range(edges):
+            edge_memory_start_index = node_memory_size + neighbor * edge_memory_size
+            if node_read_buffer[edge_memory_start_index + EDGE_HAS_ERROR_INDEX] != 0:
+                # has an error on it; adjust the weight and get rid of the error signal
+                node_write_buffer[edge_memory_start_index + EDGE_HAS_ERROR_INDEX] = 0
+                node_write_buffer[edge_memory_start_index + EDGE_ERROR_INDEX] = 0
+                node_write_buffer[edge_memory_start_index + EDGE_WEIGHT_INDEX] = node_read_buffer[edge_memory_start_index + EDGE_WEIGHT_INDEX] + node_read_buffer[edge_memory_start_index + EDGE_ERROR_INDEX] * LEARNING_RATE
+            else:
+                # does not have an error on it; error should be propagated backwards to this edge
+                node_write_buffer[edge_memory_start_index + EDGE_HAS_ERROR_INDEX] = 2
+                node_write_buffer[edge_memory_start_index + EDGE_ERROR_INDEX] = error
+
+        node_write_buffer[NODE_ERROR_JUST_SENT_INDEX] = 1
+
+
+    if node_read_buffer[NODE_ERROR_JUST_SENT_INDEX] != 0:
+        # trigger if we did a weight update and propagated error backwards last step
+        # part of backward pass
+
+        # not sending any error this step
+        node_write_buffer[NODE_ERROR_JUST_SENT_INDEX] = 0
+        # if we sent any error last step, get rid of all errors touching us and has_errors touching us this step
+        node_write_buffer[node_memory_size + EDGE_ERROR_INDEX::edge_memory_size] = 0
+        node_write_buffer[node_memory_size + EDGE_HAS_ERROR_INDEX::edge_memory_size] = 0
 
 
 class BackpropModel:
@@ -111,10 +154,14 @@ class BackpropModel:
         self.output_size = output_size
         self.layers = layers
 
+        self.secondary_output_nodes = list(range(len(self.network.nodes) - self.output_size, len(self.network.nodes)))
+
+
     def train(self, dataset, iterations=100):
         for iteration in range(iterations):
             input_data, output_data = random.choice(dataset)
             self.async_train(input_data, output_data)
+
 
     def clean(self):
         # clear everything except weights
@@ -130,14 +177,16 @@ class BackpropModel:
             edge_memory[EDGE_HAS_ERROR_INDEX] = 0
             # don't reset weights
 
+
     def forward(self, input_data):
         # set input data
         for node, signal in enumerate(input_data):
             self.network.read_buffer[node][NODE_SIGNAL_MEMORY_INDEX] = signal
-            self.network.read_buffer[node][NODE_SIGNAL_JUST_SENT_INDEX] = signal
+            self.network.read_buffer[node][NODE_SIGNAL_JUST_SENT_INDEX] = 1
             for neighbor in self.network.adjacency_dict[node]:
-                edge_memory = np.zeros(edge_memory_size)
+                edge_memory = self.network.get_edge_memory((node, neighbor))[:]
                 edge_memory[EDGE_SIGNAL_INDEX] = signal
+                edge_memory[EDGE_HAS_SIGNAL_INDEX] = 1
                 self.network.set_edge_memory(edge=(node, neighbor), edge_memory=edge_memory)
 
         # propagate input data forward
@@ -146,13 +195,11 @@ class BackpropModel:
 
         # wait for all secondary_output_nodes to have NODE_SIGNAL_JUST_SENT_INDEX
 
-        secondary_output_nodes = list(range(len(self.network.nodes) - self.output_size, len(self.network.nodes)))
-
         steps = 0
         while True:
             self.network.debug_log_buffers('step={}'.format(steps))
             self.network.step()
-            ready = all(self.network.get_node_memory(output_node)[NODE_SIGNAL_JUST_SENT_INDEX] == 1 for output_node in secondary_output_nodes)
+            ready = all(self.network.get_node_memory(output_node)[NODE_SIGNAL_JUST_SENT_INDEX] == 1 for output_node in self.secondary_output_nodes)
             if ready:
                 break
             steps += 1
@@ -162,15 +209,36 @@ class BackpropModel:
 
         output = []
 
-        for output_node in secondary_output_nodes:
+        for output_node in self.secondary_output_nodes:
             output.append(self.network.read_buffer[output_node][NODE_SIGNAL_MEMORY_INDEX])
 
         return output
 
+
     def backward(self, output_data):
-        # apply error to the last nodes/edges
-        # then run step a few times
-        return NotImplemented
+        # apply error to the secondary output edges
+        # then run step until there's no error left
+        for expected_signal, output_node in zip(output_data, self.secondary_output_nodes):
+            actual_signal = self.network.read_buffer[output_node][NODE_SIGNAL_MEMORY_INDEX]
+
+            if actual_signal < 0.0:
+                derivative = LEAKY_RELU_LEFT_SIDE_COEFFICIENT
+            else:
+                derivative = 1.0
+
+            error = (expected_signal - actual_signal) * derivative
+
+            for neighbor in self.network.adjacency_dict[output_node]:
+                edge_memory = self.network.get_edge_memory((output_node, neighbor))
+                edge_memory[EDGE_HAS_ERROR_INDEX] = 1
+                edge_memory[EDGE_ERROR_INDEX] = error
+                self.network.set_edge_memory((output_node, neighbor), edge_memory)
+
+            self.network.read_buffer[output_node][NODE_ERROR_JUST_SENT_INDEX] = 1
+
+        while any(node_buffer[NODE_ERROR_JUST_SENT_INDEX] != 0 for node_buffer in self.network.read_buffer):
+            self.network.step()
+
 
     def initialize_weights(self, weights):
         # weights = {(node_a, node_b): weight, ...}
@@ -179,6 +247,7 @@ class BackpropModel:
             edge_memory = np.zeros(edge_memory_size)
             edge_memory[EDGE_WEIGHT_INDEX] = weight
             self.network.set_edge_memory(edge, edge_memory)
+
 
     def async_train(self, input_data, output_data):
         self.clean()
