@@ -1,4 +1,3 @@
-from loopy.network import Network
 import sys
 
 import logging

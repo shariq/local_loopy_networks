@@ -4,36 +4,22 @@ import random
 import argparse
 import time
 
+from collections import defaultdict
+
 import logging
 logger = logging.getLogger()
 
-from loopy import Network
+from loopy.network import Network
 # Network(in_adjacency_dict, node_memory_size=1, edge_memory_size=2)
-from loopy.waxman_graph import directed_waxman_graph
-# directed_waxman_graph(n, alpha=0.4, beta=0.1, domain_scale=1.0, dimensionality=3)
+from loopy.graph.waxman import make_waxman_adjacency_dict
+from loopy.graph.loop import make_loop_adjacency_dict
 
-def make_loop_adjacency_dict(size=10):
-    loop_adjacency_dict = {}
-    for i in range(size):
-        loop_adjacency_dict[i] = set([(i+1) % size])
-    return loop_adjacency_dict
-
-def make_waxman_adjacency_dict(size):
-    if size > 1000:
-        logger.warn('WARNING: this waxman_graph is really big and may take way too long with our implementation')
-    if size >= 300:
-        alpha, beta = 0.2, 0.5
-    elif size >= 50:
-        alpha, beta = 0.8, 0.6
-    else:
-        alpha, beta = 1.0, 1.0
-    return directed_waxman_graph(size, alpha=alpha, beta=beta)
 
 def basic_initialize_rule(node_memory_size, edge_memory_size, edges):
     return np.zeros(node_memory_size + edge_memory_size * edges)
 
-# node_write_buffer is a reference to be written to
-def basic_update_rule(node_read_buffer, node_write_buffer, node_memory_size, edge_memory_size, edges):
+
+def basic_step_rule(node_read_buffer, node_write_buffer, node_memory_size, edge_memory_size, edges):
     node_write_buffer[:] = node_read_buffer[:]
     node_write_buffer[node_memory_size:] = 0
 
@@ -57,23 +43,6 @@ def basic_update_rule(node_read_buffer, node_write_buffer, node_memory_size, edg
         node_write_buffer[0] = 1.0
 
 
-def log_buffer(buffer):
-    print_options = np.get_printoptions()
-    np.set_printoptions(formatter={'float': '{: 0.2f}'.format})
-    for node, node_buffer in enumerate(buffer):
-        logger.debug('{}={}'.format(node, node_buffer))
-    np.set_printoptions(**print_options)
-
-
-def log_buffers(message, network):
-    logger.debug(message)
-    logger.debug('read_buffer=>')
-    log_buffer(network.read_buffer)
-    logger.debug('write_buffer=>')
-    log_buffer(network.write_buffer)
-    logger.debug('\n')
-
-
 class TestNetwork(unittest.TestCase):
     def test_init(self):
         Network(in_adjacency_dict=make_loop_adjacency_dict())
@@ -82,94 +51,63 @@ class TestNetwork(unittest.TestCase):
         network = Network(in_adjacency_dict=make_loop_adjacency_dict(), node_memory_size=1, edge_memory_size=1)
         network.initialize(initialize_rule=basic_initialize_rule)
 
-    def test_update(self):
-        network = Network(in_adjacency_dict=make_loop_adjacency_dict(), node_memory_size=1, edge_memory_size=1)
+    def test_step(self):
+        network = Network(in_adjacency_dict=make_loop_adjacency_dict(), node_memory_size=1, edge_memory_size=1, step_rule=basic_step_rule)
         network.initialize(initialize_rule=basic_initialize_rule)
-        logger.debug('\n=> test_update <=')
-        log_buffers('initialized...', network)
+        logger.debug('\n=> test_step <=')
+        network.debug_log_buffers('initialized...')
         network.write_buffer[0] = np.array([1.0, 1.0, -1.0])
-        log_buffers('manual overwrite partial', network)
+        network.debug_log_buffers('manual overwrite partial')
         network._resolve_write_to_read()
-        log_buffers('resolve_write_to_read', network)
-        network.update(update_rule=basic_update_rule)
-        log_buffers('network.update', network)
+        network.debug_log_buffers('resolve_write_to_read')
+        network.step()
+        network.debug_log_buffers('network.step')
 
-    def test_multiple_updates(self):
-        network = Network(in_adjacency_dict=make_loop_adjacency_dict(), node_memory_size=1, edge_memory_size=1)
+    def test_multiple_steps(self):
+        network = Network(in_adjacency_dict=make_loop_adjacency_dict(), node_memory_size=1, edge_memory_size=1, step_rule=basic_step_rule)
         network.initialize(initialize_rule=basic_initialize_rule)
-        logger.debug('\n=> test_multiple_updates <=')
+        logger.debug('\n=> test_multiple_steps <=')
         network.write_buffer[0] = np.array([1.0, 1.0, -1.0])
         network._resolve_write_to_read()
-        log_buffers('initialization', network)
-        network.update(update_rule=basic_update_rule)
-        log_buffers('network.update 1', network)
-        network.update(update_rule=basic_update_rule)
-        log_buffers('network.update 2', network)
-        network.update(update_rule=basic_update_rule)
-        log_buffers('network.update 3', network)
-        network.update(update_rule=basic_update_rule)
-        log_buffers('network.update 4', network)
-        network.update(update_rule=basic_update_rule)
-        log_buffers('network.update 5', network)
-        network.update(update_rule=basic_update_rule)
-        log_buffers('network.update 6', network)
+        network.debug_log_buffers('initialization')
+        for i in range(10):
+            network.step()
+            network.debug_log_buffers('network.step {}'.format(i+1))
 
-    def test_basic_update_rule(self):
-        # basic_update_rule(node_read_buffer, node_write_buffer, node_memory_size, edge_memory_size, edges)
+    def test_basic_step_rule(self):
+        # basic_step_rule(node_read_buffer, node_write_buffer, node_memory_size, edge_memory_size, edges)
         node_read_buffer = np.array([ 1.00, 1.0, -1.0])
         node_write_buffer = np.array([3.145, 3.145, 3.145])
         expected_write_buffer = np.array([0.5, 0.0, 0.0])
         node_memory_size = 1
         edge_memory_size = 1
         edges = 2
-        basic_update_rule(node_read_buffer=node_read_buffer, node_write_buffer=node_write_buffer, node_memory_size=node_memory_size, edge_memory_size=edge_memory_size, edges=edges)
+        basic_step_rule(node_read_buffer=node_read_buffer, node_write_buffer=node_write_buffer, node_memory_size=node_memory_size, edge_memory_size=edge_memory_size, edges=edges)
         self.assertSequenceEqual(node_write_buffer.tolist(), expected_write_buffer.tolist())
 
-    def test_large_loop_multiple_updates(self):
-        network = Network(in_adjacency_dict=make_loop_adjacency_dict(10000), node_memory_size=5, edge_memory_size=5)
-        logger.debug('\n=> test_large_loop_multiple_updates <=')
+    def test_large_loop_multiple_steps(self):
+        network = Network(in_adjacency_dict=make_loop_adjacency_dict(10000), node_memory_size=5, edge_memory_size=5, step_rule=basic_step_rule)
+        logger.debug('\n=> test_large_loop_multiple_steps <=')
         start = time.time()
         network.initialize(initialize_rule=basic_initialize_rule)
         logger.debug('network.initialize took {}'.format(time.time() - start))
-        start = time.time()
-        network.update(update_rule=basic_update_rule)
-        logger.debug('network.update took {}'.format(time.time() - start))
-        start = time.time()
-        network.update(update_rule=basic_update_rule)
-        logger.debug('network.update took {}'.format(time.time() - start))
-        start = time.time()
-        network.update(update_rule=basic_update_rule)
-        logger.debug('network.update took {}'.format(time.time() - start))
-        start = time.time()
-        network.update(update_rule=basic_update_rule)
-        logger.debug('network.update took {}'.format(time.time() - start))
-        start = time.time()
-        network.update(update_rule=basic_update_rule)
-        logger.debug('network.update took {}'.format(time.time() - start))
+        for i in range(10):
+            start = time.time()
+            network.step()
+            logger.debug('network.step took {}'.format(time.time() - start))
 
-    def test_large_waxman_multiple_updates(self):
-        logger.debug('\n=> test_large_waxman_multiple_updates <=')
+    def test_large_waxman_multiple_steps(self):
+        logger.debug('\n=> test_large_waxman_multiple_steps <=')
         start = time.time()
-        network = Network(in_adjacency_dict=make_waxman_adjacency_dict(1000), node_memory_size=5, edge_memory_size=5)
+        network = Network(in_adjacency_dict=make_waxman_adjacency_dict(1000), node_memory_size=5, edge_memory_size=5, step_rule=basic_step_rule)
         logger.debug('Network() took {}'.format(time.time() - start))
         start = time.time()
         network.initialize(initialize_rule=basic_initialize_rule)
         logger.debug('network.initialize took {}'.format(time.time() - start))
-        start = time.time()
-        network.update(update_rule=basic_update_rule)
-        logger.debug('network.update took {}'.format(time.time() - start))
-        start = time.time()
-        network.update(update_rule=basic_update_rule)
-        logger.debug('network.update took {}'.format(time.time() - start))
-        start = time.time()
-        network.update(update_rule=basic_update_rule)
-        logger.debug('network.update took {}'.format(time.time() - start))
-        start = time.time()
-        network.update(update_rule=basic_update_rule)
-        logger.debug('network.update took {}'.format(time.time() - start))
-        start = time.time()
-        network.update(update_rule=basic_update_rule)
-        logger.debug('network.update took {}'.format(time.time() - start))
+        for i in range(10):
+            start = time.time()
+            network.step()
+            logger.debug('network.step took {}'.format(time.time() - start))
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Run unit tests.')

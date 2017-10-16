@@ -45,6 +45,8 @@ some ideas for tests:
 - no catastrophic forgetting - so train on X then Y, then test X
 - transfer learning - learn circuit X, see if you can fine tune to X + delta
 - compositional learning - learn A, B, C, ... Z circuits, then learn composition
+- self learning: learn X, then try to learn a faster approximation for X (RL focused)
+- learn a function which has a lot of redundant circuit components, like a convolution
 
 we don't expect all hyper parameters to try and be scale invariant
 so we will fine-tune hyper parameters as we increase scale of network + compute
