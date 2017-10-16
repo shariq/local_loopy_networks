@@ -16,6 +16,7 @@ from loopy.graph.loop import make_loop_adjacency_dict
 
 unittest.run_fast = False
 
+
 def basic_initialize_rule(node_memory_size, edge_memory_size, edges):
     return np.zeros(node_memory_size + edge_memory_size * edges)
 
@@ -82,9 +83,11 @@ class TestNetwork(unittest.TestCase):
     def test_init(self):
         Network(in_adjacency_dict=make_loop_adjacency_dict())
 
+
     def test_initialize(self):
         network = Network(in_adjacency_dict=make_loop_adjacency_dict(), node_memory_size=1, edge_memory_size=2)
         network.initialize(initialize_rule=basic_initialize_rule)
+
 
     def test_step(self):
         network = Network(in_adjacency_dict=make_loop_adjacency_dict(), node_memory_size=1, edge_memory_size=2, step_rule=basic_step_rule)
@@ -100,6 +103,7 @@ class TestNetwork(unittest.TestCase):
         self.assertEqual(network.get_node_memory(1)[0], 1.0)
         self.assertEqual(network.get_node_memory(2)[0], 0.0)
 
+
     def test_multiple_steps(self):
         network = Network(in_adjacency_dict=make_loop_adjacency_dict(size=20), node_memory_size=1, edge_memory_size=2, step_rule=basic_step_rule)
         network.initialize(initialize_rule=basic_initialize_rule)
@@ -114,6 +118,7 @@ class TestNetwork(unittest.TestCase):
             network.step()
             network.debug_log_buffers('network.step {}'.format(i))
 
+
     def test_basic_step_rule(self):
         # basic_step_rule(node_read_buffer, node_write_buffer, node_memory_size, edge_memory_size, edges)
         node_read_buffer = np.array([0., 1., 1., 0., 0.])
@@ -124,6 +129,7 @@ class TestNetwork(unittest.TestCase):
         edges = 2
         basic_step_rule(node_read_buffer=node_read_buffer, node_write_buffer=node_write_buffer, node_memory_size=node_memory_size, edge_memory_size=edge_memory_size, edges=edges)
         self.assertSequenceEqual(node_write_buffer.tolist(), expected_write_buffer.tolist())
+
 
     def test_perf_large_loop_multiple_steps(self):
         if unittest.run_fast:
@@ -138,6 +144,7 @@ class TestNetwork(unittest.TestCase):
             network.step()
             logger.debug('network.step took {}'.format(time.time() - start))
 
+
     def test_perf_large_waxman_multiple_steps(self):
         if unittest.run_fast:
             self.skipTest('skipping slow tests')
@@ -150,6 +157,7 @@ class TestNetwork(unittest.TestCase):
             start = time.time()
             network.step()
             logger.debug('network.step took {}'.format(time.time() - start))
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Run unit tests.')
