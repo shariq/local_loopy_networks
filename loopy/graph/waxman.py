@@ -1,7 +1,7 @@
-# adapted from networkx waxman_graph implementation
 import random
 import math
 
+# adapted from networkx waxman_graph implementation
 def directed_waxman_graph(n, alpha=0.4, beta=0.1, domain_scale=1.0, dimensionality=3):
     r"""Return a directed Waxman random graph.
 

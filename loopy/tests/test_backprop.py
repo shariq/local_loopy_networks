@@ -12,14 +12,32 @@ logger = logging.getLogger()
 from loopy.models.backprop import BackpropModel
 
 class TestBackprop(unittest.TestCase):
-    def test_add(self):
+    def test_forward_add(self):
+        # implement an add network
+        # works with positive numbers ; ReLU messes up negative numbers
+        model = BackpropModel(input_size=2, hidden_size=1, output_size=1)
+        # input_nodes = [0, 1]
+        # hidden_nodes = [2]
+        # output_nodes = [3]
+        # secondary_output_nodes = [4]
+        model.initialize_weights({
+            (0, 2): 1.0,
+            (1, 2): 1.0,
+            (2, 3): 1.0,
+            (3, 4): 1.0
+        })
+        for a, b, c in [(1, 2, 3), (0, 1, 1), (1, 1, 2), (0, 0, 0)]:
+            expected_c = model.forward([a, b])[0]
+            self.assertEqual(c, expected_c)
+
+    def test_train_add(self):
         train_dataset = [
             ([0, 0] , [0]),
             ([0, 1] , [1]),
             ([1, 0] , [1]),
             ([1, 1] , [2]),
         ]
-        iterations = 1000
+        iterations = 100
         model = BackpropModel(input_size=2, hidden_size=1, output_size=1)
         model.train(dataset=train_dataset, iterations=iterations)
 

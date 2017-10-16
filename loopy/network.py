@@ -69,9 +69,9 @@ class Network:
         write_buffer = self.write_buffer
 
         for node in self.nodes:
-            read_buffer[node][:node_memory_size] = write_buffer[node][:node_memory_size]
+            read_buffer[node][:self.node_memory_size] = write_buffer[node][:self.node_memory_size]
             # first let's set this node's own memory to the right thing
-            read_buffer[node][node_memory_size:] = write_buffer[node][node_memory_size:] / 2.0
+            read_buffer[node][self.node_memory_size:] = write_buffer[node][self.node_memory_size:] / 2.0
             # and initialize the edge memory to half of previous value (conflicts resolved by taking average)
 
         for node in self.nodes:
@@ -104,12 +104,29 @@ class Network:
 
     def set_edge_memory(self, edge, edge_memory):
         node_a, node_b = edge
-        node_a_start_index = self.node_memory_size + self.network.sorted_adjacency_dict[node_a].index(node_b) * self.edge_memory_size
+
+        node_a_start_index = self.node_memory_size + self.sorted_adjacency_dict[node_a].index(node_b) * self.edge_memory_size
         node_a_end_index = node_a_start_index + self.edge_memory_size
-        self.network.read_buffer[node_a][node_a_start_index:node_a_end_index] = edge_memory
-        node_b_start_index = self.node_memory_size + self.network.sorted_adjacency_dict[node_b].index(node_b) * self.edge_memory_size
+        self.read_buffer[node_a][node_a_start_index:node_a_end_index] = edge_memory
+
+        node_b_start_index = self.node_memory_size + self.sorted_adjacency_dict[node_b].index(node_a) * self.edge_memory_size
         node_b_end_index = node_b_start_index + self.edge_memory_size
-        self.network.read_buffer[node_b][node_b_start_index:node_b_end_index] = edge_memory
+        self.read_buffer[node_b][node_b_start_index:node_b_end_index] = edge_memory
+
+
+    def get_edge_memory(self, edge):
+        node_a, node_b = edge
+        node_a_start_index = self.node_memory_size + self.sorted_adjacency_dict[node_a].index(node_b) * self.edge_memory_size
+        node_a_end_index = node_a_start_index + self.edge_memory_size
+        return self.read_buffer[node_a][node_a_start_index:node_a_end_index]
+
+
+    def set_node_memory(self, node, node_memory):
+        self.read_buffer[node][:self.node_memory_size] = node_memory[:]
+
+
+    def get_node_memory(self, node):
+        return self.read_buffer[node][:self.node_memory_size]
 
 
     def debug_log_buffer(self, buffer):
