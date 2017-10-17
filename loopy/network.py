@@ -31,6 +31,9 @@ class Network:
 
         buffer_size = lambda node: node_memory_size + edge_memory_size * self.adjacency_size[node]
 
+        # NOTE: this class can be reimplemented as using a single buffer
+        # biggest changes are update/initialize rules get applied in place, and when resolving conflicting writes we do something smart about only updating edges which haven't been updated before, e.g, only update edges with neighbor number > current node number
+
         self.read_buffer = [np.zeros(buffer_size(node)) for node in self.nodes]
         self.write_buffer = [np.zeros(buffer_size(node)) for node in self.nodes]
 
