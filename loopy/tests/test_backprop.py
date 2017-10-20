@@ -3,13 +3,15 @@ import numpy as np
 import random
 import argparse
 import time
+# import tensorflow as tf
 
 from collections import defaultdict
 
 import logging
 logger = logging.getLogger()
 
-from loopy.models.backprop import BackpropModel
+import loopy.models.backprop as backprop
+BackpropModel = backprop.BackpropModel
 
 class TestBackprop(unittest.TestCase):
     def test_forward_add(self):
@@ -20,7 +22,7 @@ class TestBackprop(unittest.TestCase):
         # hidden_nodes = [2]
         # output_nodes = [3]
         # secondary_output_nodes = [4]
-        model.initialize_weights({
+        model.set_weights({
             (0, 2): 1.0,
             (1, 2): 1.0,
             (2, 3): 1.0,
@@ -38,8 +40,11 @@ class TestBackprop(unittest.TestCase):
             ([1, 0] , [1]),
             ([1, 1] , [2]),
         ]
-        iterations = 1000
+        iterations = 20
+        backprop.LEARNING_RATE = 0.3
         model = BackpropModel(input_size=2, hidden_size=1, output_size=1)
+        # weights = model.get_weights()
+        # print('; '.join(['{}: {}'.format(edge, weights[edge]) for edge in [(0,2), (1,2), (2,3), (3,4)]]))
         model.train(dataset=train_dataset, iterations=iterations)
 
         ground_truth = []
@@ -51,6 +56,64 @@ class TestBackprop(unittest.TestCase):
             model_output.append(int(round(model.forward(input_data)[0])))
 
         self.assertSequenceEqual(ground_truth, model_output)
+
+
+    def test_train_or(self):
+        train_dataset = [
+            ([0, 0] , [0]),
+            ([0, 1] , [1]),
+            ([1, 0] , [1]),
+            ([1, 1] , [1]),
+        ]
+        iterations = 400
+        backprop.LEARNING_RATE = 0.03
+        model = BackpropModel(input_size=2, hidden_size=4, output_size=1)
+        # weights = model.get_weights()
+        # print('; '.join(['{}: {}'.format(edge, weights[edge]) for edge in [(0,2), (1,2), (2,3), (3,4)]]))
+        model.train(dataset=train_dataset, iterations=iterations)
+
+        ground_truth = []
+        model_output = []
+
+        for input_data, output_data in train_dataset:
+            model.clean()
+            ground_truth.append(output_data[0])
+            model_output.append(int(round(model.forward(input_data)[0])))
+
+        self.assertSequenceEqual(ground_truth, model_output)
+
+
+    def test_train_switch(self):
+        train_dataset = [
+            ([0, 0] , [0, 0]),
+            ([0, 1] , [1, 0]),
+            ([1, 0] , [0, 1]),
+            ([1, 1] , [1, 1]),
+        ]
+        iterations = 200
+        backprop.LEARNING_RATE = 0.03
+        model = BackpropModel(input_size=2, hidden_size=2, output_size=2)
+        # weights = model.get_weights()
+        # print('; '.join(['{}: {}'.format(edge, weights[edge]) for edge in [(0,2), (1,2), (2,3), (3,4)]]))
+        model.train(dataset=train_dataset, iterations=iterations)
+
+        ground_truth = []
+        model_output = []
+
+        for input_data, output_data in train_dataset:
+            model.clean()
+            ground_truth.append(output_data[0] * 10 + output_data[1])
+            sample = model.forward(input_data)
+            model_output.append(int(round(sample[0]))*10 + int(round(sample[1])))
+
+        self.assertSequenceEqual(ground_truth, model_output)
+
+
+    def test_train_mnist(self):
+        data_path = '/tmp/mnist_data'
+        iterations = 20000
+        # see mnist.py in tensorflow
+        return NotImplemented
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Run unit tests.')

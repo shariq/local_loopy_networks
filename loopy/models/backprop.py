@@ -37,7 +37,7 @@ def backprop_initialize_rule(node_memory_size, edge_memory_size, edges):
     node_buffer[node_memory_size + EDGE_HAS_SIGNAL_INDEX::edge_memory_size] = 0
     node_buffer[node_memory_size + EDGE_ERROR_INDEX::edge_memory_size] = 0.0
     node_buffer[node_memory_size + EDGE_HAS_ERROR_INDEX::edge_memory_size] = 0
-    node_buffer[node_memory_size + EDGE_WEIGHT_INDEX::edge_memory_size] = random.random() - 0.5
+    node_buffer[node_memory_size + EDGE_WEIGHT_INDEX::edge_memory_size] = random.gauss(0, 0.03)
     return node_buffer
 
 
@@ -106,16 +106,16 @@ def backprop_step_rule(node_read_buffer, node_write_buffer, node_memory_size, ed
         else:
             derivative = 1.0
 
-        total_incoming_gradient = 0.0
+        total_incoming_error = 0.0
         for neighbor in range(edges):
             edge_memory_start_index = node_memory_size + neighbor * edge_memory_size
             if node_read_buffer[edge_memory_start_index + EDGE_HAS_ERROR_INDEX] != 0:
                 # has an error on it
-                total_incoming_gradient += node_read_buffer[edge_memory_start_index + EDGE_WEIGHT_INDEX] * node_read_buffer[edge_memory_start_index + EDGE_ERROR_INDEX]
+                total_incoming_error += node_read_buffer[edge_memory_start_index + EDGE_ERROR_INDEX]
             else:
                 pass
 
-        error = total_incoming_gradient * derivative
+        error = total_incoming_error * derivative
 
         for neighbor in range(edges):
             edge_memory_start_index = node_memory_size + neighbor * edge_memory_size
@@ -123,7 +123,7 @@ def backprop_step_rule(node_read_buffer, node_write_buffer, node_memory_size, ed
                 # has an error on it; adjust the weight and get rid of the error signal
                 node_write_buffer[edge_memory_start_index + EDGE_HAS_ERROR_INDEX] = 0
                 node_write_buffer[edge_memory_start_index + EDGE_ERROR_INDEX] = 0
-                node_write_buffer[edge_memory_start_index + EDGE_WEIGHT_INDEX] = node_read_buffer[edge_memory_start_index + EDGE_WEIGHT_INDEX] + node_read_buffer[edge_memory_start_index + EDGE_ERROR_INDEX] * LEARNING_RATE
+                node_write_buffer[edge_memory_start_index + EDGE_WEIGHT_INDEX] = node_read_buffer[edge_memory_start_index + EDGE_WEIGHT_INDEX] + error * LEARNING_RATE
             else:
                 # does not have an error on it; error should be propagated backwards to this edge
                 node_write_buffer[edge_memory_start_index + EDGE_HAS_ERROR_INDEX] = 2
@@ -240,13 +240,23 @@ class BackpropModel:
             self.network.step()
 
 
-    def initialize_weights(self, weights):
+    def set_weights(self, weights):
         # weights = {(node_a, node_b): weight, ...}
         self.clean()
         for edge, weight in weights.items():
             edge_memory = np.zeros(edge_memory_size)
             edge_memory[EDGE_WEIGHT_INDEX] = weight
             self.network.set_edge_memory(edge, edge_memory)
+
+
+    def get_weights(self):
+        weights = {}
+        for node in self.network.adjacency_dict:
+            for neighbor in self.network.adjacency_dict[node]:
+                edge = (node, neighbor)
+                weight = self.network.get_edge_memory(edge)[EDGE_WEIGHT_INDEX]
+                weights[edge] = weight
+        return weights
 
 
     def async_train(self, input_data, output_data):
