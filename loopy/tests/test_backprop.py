@@ -40,7 +40,7 @@ class TestBackprop(unittest.TestCase):
             ([1, 0] , [1]),
             ([1, 1] , [2]),
         ]
-        iterations = 20
+        iterations = 100
         backprop.LEARNING_RATE = 0.3
         model = BackpropModel(input_size=2, hidden_size=1, output_size=1)
         # weights = model.get_weights()
@@ -90,9 +90,9 @@ class TestBackprop(unittest.TestCase):
             ([1, 0] , [0, 1]),
             ([1, 1] , [1, 1]),
         ]
-        iterations = 200
+        iterations = 1000
         backprop.LEARNING_RATE = 0.03
-        model = BackpropModel(input_size=2, hidden_size=2, output_size=2)
+        model = BackpropModel(input_size=2, hidden_size=8, output_size=2)
         # weights = model.get_weights()
         # print('; '.join(['{}: {}'.format(edge, weights[edge]) for edge in [(0,2), (1,2), (2,3), (3,4)]]))
         model.train(dataset=train_dataset, iterations=iterations)
@@ -104,6 +104,7 @@ class TestBackprop(unittest.TestCase):
             model.clean()
             ground_truth.append(output_data[0] * 10 + output_data[1])
             sample = model.forward(input_data)
+            print(sample)
             model_output.append(int(round(sample[0]))*10 + int(round(sample[1])))
 
         self.assertSequenceEqual(ground_truth, model_output)
