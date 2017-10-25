@@ -1,3 +1,21 @@
+# October 24, 2017
+
+Oct 16 - 24 has had little to no useful work. I had been trying to think of a good way to parametrize the search space. Time to make a decision... I think what needs to be done is I just need to use the best thing I thought of, in some interesting learning setting(s). Learning setting(s) defined as input/output/topology rules. Initially I want to find a learning rule which works with some sampled Waxman graphs (located in liquid.py); and input/output are sent in one/more obvious ways; and the whole thing is forced to use some signals and error. It would be nice to do everything with one signal, but forget that crazy idea for now: we can easily modify the tests once they exist to try this and other ideas. Much more important to get something kind of OK working, then to make it better through new knowledge gained. Bad pattern I find myself consistently falling into - planning too much instead of doing enough - thankfully I'm not kind of aware of it and can try to consciously prevent it.
+
+I want to have a working learning rule by Thursday (Oct 27): so I can share at the OpenAI alum dinner! So today I finish a shitty search implementation; tomorrow I run it a bit, make obvious improvements, make it distributed; run overnight on 200 servers and cross fingers!!!
+
+I will implement the rules as some kind of formal grammar. One of the rules will be to assign a value to a variable. If a variable is used before it has something assigned to it, it will be automatically assigned something from the rest of the graph. This is how reuse of expressions will occur.
+
+So that's pretty easy and will easily give us a nice string describing our code. Maybe we'll modify to have the rules all have some weight, but past that all rules will be context free and probability will be context free (otherwise we will drown in complexity).
+
+Once we have a nice string, we need to turn that into some code. To make life easier we can probably just have the string be the code; if that doesn't work for some reason we can do a simple post processing step. Post processing step would preferably have two passes, one to gather some data about the rule, another to do a string replace. (e.g, memory sizes)
+
+We will also need a nice test harness, which we currently don't have. It must support a input and output forms and a few different graph topologies, preferably of different sizes. The tests will be simply training AND, OR, and adding and subtracting (two different subtractions). We will need a way to limit how long the test runs for before it's declared a failure: this logic goes in the input and output code, and raises a loopylimit exception.
+
+Once this is done, we test by generating a bunch of rules and seeing what the output looks like. We maybe add a few small changes to make the outputs look nicer more often, like limiting string length or making reuse more likely, or changing how vector operations work like throwing away rules which use nonmatching vector lengths (mainly filtering edge memories/using signals), changing probabilities on rules being applied.
+
+Then it's time to sleep.
+
 # October 16, 2017
 
 Successfully implemented and tested backprop as a local learning rule, and wrote a nice loopy module.
