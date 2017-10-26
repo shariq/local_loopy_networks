@@ -1,25 +1,17 @@
-filter_import random
+import random
 from collections import defaultdict
 
 # the way we make an expression of some complexity is to take a blank expression and randomly distort it, and keep doing that until we get our desired length
 # increase_complexity should sample from the right distribution; so adding one node which may increase complexity by too much at once; but it's all approximate anyways so it's fine if it's a bit off
 
-def sample_model_code():
-    model = Model()
-    model.generate()
-    return model.render()
-
-
 class Model:
-    def __init__(self, input_size=2, output_size=1, ruleset_generator=None, harness_generator=None):
+    def __init__(self, ruleset_generator=None, harness_generator=None):
         if ruleset_generator is None:
             ruleset_generator = Ruleset
         self.ruleset_generator = ruleset_generator
         if harness_generator is None:
             harness_generator = Harness
         self.harness_generator = harness_generator
-        self.input_size = input_size
-        self.output_size = output_size
 
     def sample_node_memory_size(self):
         self.node_memory_size = random.choice([1, 2, 3, 4, 5])
@@ -35,7 +27,7 @@ class Model:
         self.ruleset = self.ruleset_generator(node_memory_size=self.node_memory_size, edge_memory_size=self.edge_memory_size)
         self.ruleset.generate()
 
-        self.harness = self.harness_generator(input_size=input_size, output_size=output_size)
+        self.harness = self.harness_generator()
         self.harness.generate()
 
     def render(self):
@@ -46,14 +38,13 @@ class Model:
 
 class Harness:
     # picks forward, backward, init, train, and async_train methods
-    def __init__(self, input_size, output_size):
-        self.input_size = input_size
-        self.output_size = output_size
+    def __init__(self):
+        pass
 
     def generate(self):
         # generating python code is a bit annoying because of indentation... don't assume indentation when generating each line; always add that later
         # of course this is really bad if we have any multiline strings...
-        self.init_method = 'def __init__(self):pass'
+        self.init_method = 'def __init__(self, input_size=2, output_size=1):pass'
         self.forward_method = 'def forward(self, *args, **kwargs):pass'
         self.backward_method = 'def backward(self, *args, **kwargs):pass'
         self.train_method = 'def train(self):pass'
@@ -82,7 +73,7 @@ class Ruleset:
         if slot_type == 'float':
             return 1
     def sample_number_filters(self):
-        self.number_filters = [random.choice(list(range(4, 7)) + list(range(2, 9)))]
+        self.number_filters = random.choice(list(range(4, 7)) + list(range(2, 9)))
         return self.number_filters
     def sample_filter_complexities(self):
         if self.number_filters is None:
@@ -103,6 +94,7 @@ class Ruleset:
         return self.slot_filter_usage_frequency
 
     def generate(self):
+        self.sample_number_filters()
         self.sample_filter_complexities()
         self.sample_slot_filter_usage_frequency()
         filter_holder = FilterHolder(filter_complexities=self.filter_complexities)

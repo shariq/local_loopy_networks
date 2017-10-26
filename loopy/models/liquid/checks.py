@@ -1,0 +1,88 @@
+# all checks return a float from 0 to 1, saying how well this check did
+# we maybe keep track of all checks performed, and then can query by different checks
+
+def check_basic_function(harness_class, train_dataset):
+    # important: accuracy is checked by rounding output, and comparing the whole output vectors to each other
+    # we could use a real loss function but that makes life a lot messier with these really simple functions...
+
+    output_size = len(train_dataset[0][1])
+    input_size = len(train_dataset[0][0])
+
+    harness = harness_class(input_size=input_size, output_size=output_size)
+
+    iterations = 20 * len(train_dataset) * (output_size + input_size)
+    harness.train(dataset=train_dataset, iterations=iterations)
+
+    number_correct_examples = 0
+
+    for input_data, ground_truth in train_dataset:
+        try:
+            harness_output = harness.forward(input_data)
+        except Exception:
+            continue
+        int_ground_truth = [int(round(f)) for f in ground_truth]
+        int_harness_output = [int(round(f)) for f in harness_output]
+
+        if all(a==b for a, b in zip(int_ground_truth, int_harness_output)):
+            number_correct_examples += 1
+
+    return float(number_correct_examples) / len(train_dataset)
+
+
+def check_add(harness):
+    train_dataset = [
+        ([0, 0] , [0]),
+        ([0, 1] , [1]),
+        ([1, 0] , [1]),
+        ([1, 1] , [2]),
+    ]
+    return check_basic_function(harness, train_dataset)
+check_add.accuracy_requirement = 0.5
+
+
+def check_subtract(harness):
+    train_dataset = [
+        ([0, 0] , [0]),
+        ([0, 1] , [-1]),
+        ([1, 0] , [1]),
+        ([1, 1] , [0]),
+    ]
+    return check_basic_function(harness, train_dataset)
+check_subtract.accuracy_requirement = 0.5
+
+
+def check_and(harness):
+    train_dataset = [
+        ([0, 0] , [0]),
+        ([0, 1] , [0]),
+        ([1, 0] , [0]),
+        ([1, 1] , [1]),
+    ]
+    return check_basic_function(harness, train_dataset)
+check_and.accuracy_requirement = 0.5
+
+
+def check_or(harness):
+    train_dataset = [
+        ([0, 0] , [0]),
+        ([0, 1] , [1]),
+        ([1, 0] , [1]),
+        ([1, 1] , [1]),
+    ]
+    return check_basic_function(harness, train_dataset)
+check_or.accuracy_requirement = 0.5
+
+
+def check_switch(harness):
+    train_dataset = [
+        ([0, 0] , [0, 0]),
+        ([0, 1] , [1, 0]),
+        ([1, 0] , [0, 1]),
+        ([1, 1] , [1, 1]),
+    ]
+    return check_basic_function(harness, train_dataset)
+check_switch.accuracy_requirement = 0.5
+
+
+all_checks = [check_add, check_subtract, check_and, check_or, check_switch]
+all_checks_accuracy_requirements = [check.accuracy_requirement for check in all_checks]
