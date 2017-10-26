@@ -11,10 +11,9 @@ update rule + initialize rule primitives and functions:
 - subtract(a, b)
 - abs(a)
 - primitives for operating on vectors:
-    - index(v, a, b)
     - reduce operations; forced when sticking into single variable
-    - elementwise operations with automatic resizing
-    - with context(expr): operate only on edge/node memory where this expr holds (???)
+    - elementwise operations with automatic resizing; requires same type of vector (finite number of types, defined up front)
+    - filter(filter_number, signal | error | edge_memory_index | filter_expression) -> for that filter number, gets the corresponding edge values (filter_expression is the filter_expression used to make that filter)
 - >=, <=, ==
 - uniform_random(-0.5, 0.5)
 - gaussian(0, 1)
