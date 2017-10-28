@@ -9,6 +9,7 @@ import loopy.models.liquid.factory.generator as generator
 
 
 def compile_harness(harness_code, class_name='Harness', module_name='harness_module'):
+    print(harness_code)
     compiled = compile(harness_code, '', 'exec')
     module = ModuleType(module_name)
     exec(compiled, module.__dict__)
@@ -22,6 +23,11 @@ def search_harness():
             generator_model.generate()
             harness_code = generator_model.render()
             harness_class = compile_harness(harness_code)
+
+            #generator_model = None
+            #harness_code = 'backprop'
+            #from loopy.models.backprop import BackpropModel as harness_class
+            ## above tests that backprop as a harness does in fact work with these checks
         except Exception as e:
             logger.error(e, exc_info=True)
             continue
@@ -41,7 +47,6 @@ def search_harness():
 
 if __name__ == '__main__':
     logger.setLevel(logging.DEBUG)
-    print('a')
     for _, code, results in search_harness():
         total_score = sum(results) / len(results)
-        logger.info('{} got total_score {}'.format(code[:200].replace('\n', '\\n'), total_score))
+        logger.info('{} got score {} with results {}'.format(code[:200].replace('\n', '\\n'), total_score, results))

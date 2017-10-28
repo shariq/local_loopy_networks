@@ -197,7 +197,7 @@ class BackpropModel:
 
         steps = 0
         while True:
-            self.network.debug_log_buffers('step={}'.format(steps))
+            #self.network.debug_log_buffers('step={}'.format(steps))
             self.network.step()
             ready = all(self.network.get_node_memory(output_node)[NODE_SIGNAL_JUST_SENT_INDEX] == 1 for output_node in self.secondary_output_nodes)
             if ready:
