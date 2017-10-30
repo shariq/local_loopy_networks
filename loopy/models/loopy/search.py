@@ -2,13 +2,13 @@ import loopy
 import logging
 logger = logging.getLogger()
 
-from loopy.models.liquid.checks import all_checks, all_checks_accuracy_requirements
+from loopy.models.loopy.checks import all_checks, all_checks_accuracy_requirements
 
 from types import ModuleType
-import loopy.models.liquid.factory.generator as generator
+import loopy.models.loopy.factory.generator as generator
 
 
-def compile_harness(harness_code, class_name='Harness', module_name='harness_module'):
+def compile_model(harness_code, class_name='Model', module_name='harness_module'):
     print(harness_code)
     compiled = compile(harness_code, '', 'exec')
     module = ModuleType(module_name)
@@ -19,22 +19,22 @@ def compile_harness(harness_code, class_name='Harness', module_name='harness_mod
 def search_harness():
     while True:
         try:
-            generator_model = generator.Model()
-            generator_model.generate()
-            harness_code = generator_model.render()
-            harness_class = compile_harness(harness_code)
+            generator_harness = generator.Harness()
+            generator_harness.generate()
+            harness_code = generator_harness.render()
+            model_class = compile_model(harness_code)
 
             #generator_model = None
             #harness_code = 'backprop'
-            #from loopy.models.backprop import BackpropModel as harness_class
-            ## above tests that backprop as a harness does in fact work with these checks
+            #from loopy.models.backprop import BackpropModel as model_class
+            ## above tests that backprop as a model does in fact work with these checks
         except Exception as e:
             logger.error(e, exc_info=True)
             continue
         results = [0.0] * len(all_checks)
         for check_index, check, accuracy_requirement in zip(range(len(all_checks)), all_checks, all_checks_accuracy_requirements):
             try:
-                check_accuracy = check(harness_class)
+                check_accuracy = check(model_class)
                 if check_accuracy >= accuracy_requirement:
                     results[check_index] = check_accuracy
                 else:
@@ -42,7 +42,7 @@ def search_harness():
             except Exception as e:
                 logger.error(e, exc_info=True)
                 break
-        yield generator_model, harness_code, results
+        yield generator_harness, harness_code, results
 
 
 if __name__ == '__main__':

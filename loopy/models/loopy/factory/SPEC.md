@@ -27,8 +27,6 @@ update rule + initialize rule primitives and functions:
 - stdev(a)
 - sin(a)
 - cos(a)
-- conditionals:
-    - if(expr, a, b): a if expr else b
 - sgn(a)
 - node(a) (node memory at some a; a is picked randomly when generating node(a))
 - edge(a) (edge memory at some a for all edges; a is picked randomly when generating edge(a))

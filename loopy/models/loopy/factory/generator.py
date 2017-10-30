@@ -4,14 +4,14 @@ from collections import defaultdict
 # the way we make an expression of some complexity is to take a blank expression and randomly distort it, and keep doing that until we get our desired length
 # increase_complexity should sample from the right distribution; so adding one node which may increase complexity by too much at once; but it's all approximate anyways so it's fine if it's a bit off
 
-class Model:
-    def __init__(self, ruleset_generator=None, harness_generator=None):
+# operators, slots, and other things like that (filtering) are defined somehow outside the scope of this code
+# code generated here should try as much as possible to only be the parts which are unique between different runs of generator.py, except when that reduces readability
+
+class Harness:
+    def __init__(self, ruleset_generator=None):
         if ruleset_generator is None:
             ruleset_generator = Ruleset
         self.ruleset_generator = ruleset_generator
-        if harness_generator is None:
-            harness_generator = Harness
-        self.harness_generator = harness_generator
 
     def sample_node_memory_size(self):
         self.node_memory_size = random.choice([1, 2, 3, 4, 5])
@@ -27,16 +27,16 @@ class Model:
         self.ruleset = self.ruleset_generator(node_memory_size=self.node_memory_size, edge_memory_size=self.edge_memory_size)
         self.ruleset.generate()
 
-        self.harness = self.harness_generator()
-        self.harness.generate()
+        self.model = Model()
+        self.model.generate()
 
     def render(self):
         ruleset_code = self.ruleset.render()
-        harness_code = self.harness.render()
-        return ruleset_code + '\n\n\n' + harness_code
+        model_code = self.model.render()
+        return ruleset_code + '\n\n\n' + model_code
 
 
-class Harness:
+class Model:
     # picks forward, backward, init, train, and async_train methods
     def __init__(self):
         pass
@@ -50,7 +50,7 @@ class Harness:
         self.train_method = 'def train(self):pass'
         self.async_train_method = 'def async_train(self):pass'
 
-        self.header = 'class Harness:'
+        self.header = 'class Model:'
 
         self.methods = [self.init_method, self.forward_method, self.backward_method, self.train_method, self.async_train_method]
 
@@ -97,8 +97,13 @@ class Ruleset:
         self.sample_number_filters()
         self.sample_filter_complexities()
         self.sample_slot_filter_usage_frequency()
-        filter_holder = FilterHolder(filter_complexities=self.filter_complexities)
-        self.filters = filter_holder.generate_filters()
+        self.filters = []
+
+        # TODO: need default filters for signals - has_signal, has_error, not_has_signal, not_has_error
+        for filter_complexity in self.filter_complexities:
+            filter_expression = ExpressionTree(slot_type='vector', slot_filter=None, expression_complexity=filter_complexity, base_expression=None, expression_type='filter', filters=[], parent=None)
+            filter_expression.generate()
+            self.filters.append(filter_expression)
 
         slot_values = ['slot_node_{}'.format(i) for i in range(self.node_memory_size)] + ['slot_signal_0', 'slot_signal_1'] + ['slot_edge_{}'.format(i) for i in range(self.edge_memory_size)]
         slot_types = ['float'] * self.node_memory_size + ['vector'] * (2 + self.edge_memory_size)
@@ -107,7 +112,7 @@ class Ruleset:
         self.initialize_rules = []
 
         for slot_value, slot_type in zip(slot_values, slot_types):
-            rule = Rule(filters=self.filters, slot_type=slot_type, slot_value=slot_value, expression_complexity=self.sample_initialize_expression_complexity(slot_type), slot_filter_usage_frequency=0.0, base_expression='float_0', is_initialize_rule=True)
+            rule = Rule(filters=self.filters, slot_type=slot_type, slot_value=slot_value, expression_complexity=self.sample_initialize_expression_complexity(slot_type), slot_filter_usage_frequency=0.0, base_expression='float_0', expression_type='initialize')
             rule.generate()
             self.initialize_rules.append(rule)
 
@@ -116,7 +121,7 @@ class Ruleset:
         for slot_value, slot_type in zip(slot_values, slot_types):
             self.step_rules.append([])
             for _ in range(self.sample_rules_per_slot(slot_type)):
-                rule = Rule(filters=self.filters, slot_type=slot_type, slot_value=slot_value, expression_complexity=self.sample_step_expression_complexity(slot_type), slot_filter_usage_frequency=self.slot_filter_usage_frequency, base_expression=slot_value, is_initialize_rule=False)
+                rule = Rule(filters=self.filters, slot_type=slot_type, slot_value=slot_value, expression_complexity=self.sample_step_expression_complexity(slot_type), slot_filter_usage_frequency=self.slot_filter_usage_frequency, base_expression=slot_value, expression_type='step')
                 rule.generate()
                 self.step_rules[-1].append(rule)
 
@@ -139,10 +144,9 @@ class Ruleset:
 
     def render_rule(self, rule):
         assert rule.slot_type in ['vector', 'float']
-        if rule.slot_type == 'vector':
-            return '(VECTOR) {slot_value}[filter={slot_filter}] = {rendered_expression}'.format(slot_value=rule.slot_value, slot_filter=rule.slot_filter, rendered_expression=self.render_expression_tree(rule.expression_tree))
-        if rule.slot_type == 'float':
-            return '(FLOAT) {slot_value} = {rendered_expression}'.format(slot_value=rule.slot_value, rendered_expression=self.render_expression_tree(rule.expression_tree))
+        if rule.slot_type == 'vector' and rule.slot_filter is not None:
+                return '(VECTOR) {slot_value}[filter={slot_filter}] = {rendered_expression}'.format(slot_value=rule.slot_value, slot_filter=self.render_expression_tree(rule.slot_filter), rendered_expression=self.render_expression_tree(rule.expression_tree))
+        return '({slot_type}) {slot_value} = {rendered_expression}'.format(slot_type=rule.slot_type.upper(), slot_value=rule.slot_value, rendered_expression=self.render_expression_tree(rule.expression_tree))
 
     def render_expression_tree(self, expression_tree):
         # do it here because there's a lot of state which we really don't want the rules to also be keeping track of, which tells us, e.g, how many memory slots there are, etc
@@ -153,14 +157,15 @@ class Ruleset:
 
 
 class Rule:
-    def __init__(self, filters, slot_type, slot_value, expression_complexity, slot_filter_usage_frequency, base_expression, is_initialize_rule):
+    def __init__(self, filters, slot_type, slot_value, expression_complexity, slot_filter_usage_frequency, base_expression, expression_type):
         self.filters = filters
         self.slot_type = slot_type
         self.slot_value = slot_value
         self.expression_complexity = expression_complexity
         self.slot_filter_usage_frequency = slot_filter_usage_frequency
         self.base_expression = base_expression
-        self.is_initialize_rule = is_initialize_rule
+        self.expression_type = expression_type
+
     def generate(self):
         slot_filter = None
         if self.slot_type == 'vector' and random.random() < self.slot_filter_usage_frequency:
@@ -168,29 +173,15 @@ class Rule:
             # (meaning this rule does not overwrite the whole slot; only some filtered version of the slot)
             slot_filter = random.choice(self.filters)
         self.slot_filter = slot_filter
-        self.expression_tree = ExpressionTree(slot_type=self.slot_type, slot_filter=self.slot_filter, filters=self.filters, expression_complexity=self.expression_complexity, base_expression=self.base_expression, is_initialize_rule=self.is_initialize_rule)
+        self.expression_tree = ExpressionTree(slot_type=self.slot_type, slot_filter=self.slot_filter, filters=self.filters, expression_complexity=self.expression_complexity, base_expression=self.base_expression, expression_type=self.expression_type)
         self.expression_tree.generate()
         return self
 
 
-class FilterHolder:
-    def __init__(self, filter_complexities):
-        self.filter_complexities = filter_complexities
-    def generate_filters(self):
-        filters = []
-        for filter_complexity in self.filter_complexities:
-            filters.append(self.generate_filter(filter_complexity=filter_complexity))
-        self.filters = filters
-        return filters
-    def generate_filter(self, filter_complexity):
-        filter_ = FilterExpressionTree(slot_type='vector', slot_filter=[], expression_complexity=filter_complexity, base_expression=None, is_initialize_rule=False, filters=[], parent=None)
-        filter_.generate()
-        return filter_
-
-
 class ExpressionTree:
-    def __init__(self, slot_type, slot_filter, expression_complexity, base_expression, is_initialize_rule, filters, parent=None):
+    def __init__(self, slot_type, slot_filter, expression_complexity, base_expression, expression_type, filters, parent=None):
         self.slot_type = slot_type
+        assert slot_type in ['vector', 'float']
         self.slot_filter = slot_filter
         # together the above two define the return type of this expression; a slot_filter does not make much sense on slot_type == float
         if self.slot_type != 'vector':
@@ -200,9 +191,10 @@ class ExpressionTree:
         # the target expression_complexity: complexity is for now defined as number of nodes in the ExpressionTree, but this may be changed to ignore certain kinds of nodes ()
 
         self.base_expression = base_expression
-        # the expression which this tree starts from; in case that needs to be overwritten (e.g, initialize rules default to a base_expression of 0, whereas update rules default to a base_expression of what is being assigned)
+        # the expression which this tree starts from; in case that needs to be overwritten (e.g, initialize rules default to a base_expression of 0, whereas step rules default to a base_expression of what is being assigned)
 
-        self.is_initialize_rule = is_initialize_rule
+        self.expression_type = expression_type
+        assert expression_type in ['initialize', 'step', 'filter']
         self.filters= filters
 
         if parent is None:
@@ -221,6 +213,8 @@ class ExpressionTree:
             # initialize ExpressionTree with this operator
         else:
             self.operator = random.choice(['add', 'multiply'])
+
+        # do some stuff to ensure base_expression is valid: if it needs children, give it children
 
         while abs(self.get_complexity() - self.expression_complexity) >= 3:
             if self.get_complexity() > self.expression_complexity:
@@ -249,14 +243,12 @@ class ExpressionTree:
         nodes = list(self.traverse_nodes())
         childless_nodes = [node for node in nodes if len(node.children) < 2]
         node_to_distort = random.choice(childless_nodes)
-        node_to_distort.children.append(ExpressionTree(slot_type=self.slot_type, slot_filter=self.slot_filter, expression_complexity=1, base_expression=None, is_initialize_rule=self.is_initialize_rule, filters=self.filters, parent=self))
+        new_node = ExpressionTree(slot_type=self.slot_type, slot_filter=self.slot_filter, expression_complexity=1, base_expression=None, expression_type=self.expression_type, filters=self.filters, parent=self)
+        new_node.generate()
+        node_to_distort.children.append(new_node)
 
     def decrease_complexity(self):
         nodes = list(self.traverse_nodes())
         leaf_nodes = [node for node in nodes if len(node.children) == 0]
         node_to_delete = random.choice(leaf_nodes)
         node_to_delete.parent.children.remove(node_to_delete)
-
-
-class FilterExpressionTree(ExpressionTree):
-    pass
