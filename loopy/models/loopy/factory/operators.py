@@ -5,6 +5,8 @@ import inspect
 
 float_32_dtype = np.dtype('float32')
 
+# operators are the elements of an ExpressionTree which have children
+
 #############
 # helper functions
 #############
@@ -49,7 +51,7 @@ def equal(a, b):
 
 
 ##############
-# operators which take in a single float or vector
+# operators which take in a single float or vector; return same type
 ##############
 
 abs = abs
@@ -73,17 +75,6 @@ sin = np.sin
 @np_float_wrapper
 def sign(a):
     return np.sign(a)
-
-##############
-# operators which generate vector/float depending on type requested / context of request
-##############
-# no idea how this will work yet
-
-def gaussian(length):
-    return NotImplemented
-
-def uniform_random(length):
-    return NotImplemented
 
 ##############
 # reducing operators; take a vector return a float

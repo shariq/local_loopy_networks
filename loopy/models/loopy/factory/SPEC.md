@@ -1,3 +1,5 @@
+REMINDER: you can reuse parts of the ExpressionTree in itself to make the distribution of complex ExpressionTrees nicer (i.e, if we use node_memory[0] > edge_memory[0] * 2 then it should be somewhat likely we use it multiple times and not just once)
+
 number of signal channels
 (automatically propagated)
 
@@ -30,10 +32,7 @@ update rule + initialize rule primitives and functions:
 - sgn(a)
 - node(a) (node memory at some a; a is picked randomly when generating node(a))
 - edge(a) (edge memory at some a for all edges; a is picked randomly when generating edge(a))
-- primitives for memory over time (add new edge/node memory):
-    - memory of last signal stored for some signal channel (automatically adds new edge memory)
-    - mean or stdev of an expression
-    - normalize(expression) = take expression - mean / stdev
+
 - functions which are error prone; so don't include them:
     - exp(a)
     - log(a)

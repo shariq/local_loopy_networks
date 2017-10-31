@@ -72,6 +72,14 @@ class Ruleset:
             return random.choice([1, 1, 1, 1, 1, 2, 2, 3, 4, 5])
         if slot_type == 'float':
             return 1
+    def sample_number_conditionals(self):
+        self.number_conditionals = random.choice(list(range(4, 7)) + list(range(2, 9)))
+        return self.number_conditionals
+    def sample_conditional_complexities(self):
+        if self.number_conditionals is None:
+            raise Exception('must call sample_number_conditionals and assign self.number_conditionals before calling sample_conditional_complexities')
+        self.conditional_complexities = [random.choice(list(range(1,5)) + list(range(1,11))) for i in range(self.number_conditionals)]
+        return self.filter_complexities
     def sample_number_filters(self):
         self.number_filters = random.choice(list(range(4, 7)) + list(range(2, 9)))
         return self.number_filters
@@ -92,11 +100,20 @@ class Ruleset:
     def sample_slot_filter_usage_frequency(self):
         self.slot_filter_usage_frequency = random.random()
         return self.slot_filter_usage_frequency
+    def sample_slot_conditional_usage_frequency(self):
+        self.slot_conditional_usage_frequency = random.random()
+        return self.slot_conditional_usage_frequency
 
     def generate(self):
         self.sample_number_filters()
         self.sample_filter_complexities()
+
+        self.sample_number_conditionals()
+        self.sample_conditional_complexities()
+
         self.sample_slot_filter_usage_frequency()
+        self.sample_slot_conditional_usage_frequency()
+
         self.filters = []
 
         # TODO: need default filters for signals - has_signal, has_error, not_has_signal, not_has_error
@@ -105,6 +122,13 @@ class Ruleset:
             filter_expression.generate()
             self.filters.append(filter_expression)
 
+        self.conditionals = []
+        # TODO: need default conditionals for signals - any edge has signal, any edge has error, no edge has signal, no edge has error
+        for conditional_complexity in self.conditional_complexities:
+            conditional_expression = ExpressionTree(slot_type='float', slot_filter=None, expression_complexity=conditional_complexity, base_expression=None, expression_type='conditional', filters=self.filters, parent=None)
+            conditional_expression.generate()
+            self.conditionals.append(conditional_expression)
+
         slot_values = ['slot_node_{}'.format(i) for i in range(self.node_memory_size)] + ['slot_signal_0', 'slot_signal_1'] + ['slot_edge_{}'.format(i) for i in range(self.edge_memory_size)]
         slot_types = ['float'] * self.node_memory_size + ['vector'] * (2 + self.edge_memory_size)
         # 2 => signal + error vectors on each edge (signal_0 = signal; signal_1 = error)
@@ -112,7 +136,7 @@ class Ruleset:
         self.initialize_rules = []
 
         for slot_value, slot_type in zip(slot_values, slot_types):
-            rule = Rule(filters=self.filters, slot_type=slot_type, slot_value=slot_value, expression_complexity=self.sample_initialize_expression_complexity(slot_type), slot_filter_usage_frequency=0.0, base_expression='float_0', expression_type='initialize')
+            rule = Rule(filters=self.filters, conditionals=self.conditionals, slot_type=slot_type, slot_value=slot_value, expression_complexity=self.sample_initialize_expression_complexity(slot_type), slot_filter_usage_frequency=0.0,  slot_conditional_usage_frequency=0.0, base_expression='float_0', expression_type='initialize')
             rule.generate()
             self.initialize_rules.append(rule)
 
@@ -121,7 +145,7 @@ class Ruleset:
         for slot_value, slot_type in zip(slot_values, slot_types):
             self.step_rules.append([])
             for _ in range(self.sample_rules_per_slot(slot_type)):
-                rule = Rule(filters=self.filters, slot_type=slot_type, slot_value=slot_value, expression_complexity=self.sample_step_expression_complexity(slot_type), slot_filter_usage_frequency=self.slot_filter_usage_frequency, base_expression=slot_value, expression_type='step')
+                rule = Rule(filters=self.filters, conditionals=self.conditionals, slot_type=slot_type, slot_value=slot_value, expression_complexity=self.sample_step_expression_complexity(slot_type), slot_filter_usage_frequency=self.slot_filter_usage_frequency, slot_conditional_usage_frequency=self.slot_conditional_usage_frequency, base_expression=slot_value, expression_type='step')
                 rule.generate()
                 self.step_rules[-1].append(rule)
 
@@ -157,29 +181,39 @@ class Ruleset:
 
 
 class Rule:
-    def __init__(self, filters, slot_type, slot_value, expression_complexity, slot_filter_usage_frequency, base_expression, expression_type):
+    def __init__(self, filters, conditionals, slot_type, slot_value, expression_complexity, slot_filter_usage_frequency, slot_conditional_usage_frequency, base_expression, expression_type):
         self.filters = filters
+        self.conditionals = conditionals
         self.slot_type = slot_type
         self.slot_value = slot_value
         self.expression_complexity = expression_complexity
         self.slot_filter_usage_frequency = slot_filter_usage_frequency
+        self.slot_conditional_usage_frequency = slot_conditional_usage_frequency
         self.base_expression = base_expression
         self.expression_type = expression_type
 
     def generate(self):
         slot_filter = None
-        if self.slot_type == 'vector' and random.random() < self.slot_filter_usage_frequency:
+        if self.filters and len(self.filters) and self.slot_type == 'vector' and random.random() < self.slot_filter_usage_frequency:
             # use a slot filter
             # (meaning this rule does not overwrite the whole slot; only some filtered version of the slot)
             slot_filter = random.choice(self.filters)
         self.slot_filter = slot_filter
-        self.expression_tree = ExpressionTree(slot_type=self.slot_type, slot_filter=self.slot_filter, filters=self.filters, expression_complexity=self.expression_complexity, base_expression=self.base_expression, expression_type=self.expression_type)
+
+        slot_conditional = None
+        if self.conditionals and len(self.conditionals) and random.random() < self.slot_conditional_usage_frequency:
+            # use a slot conditional
+            # (meaning this rule is only run if this conditional is true)
+            slot_conditional = random.choice(self.conditionals)
+        self.slot_conditional = slot_conditional
+
+        self.expression_tree = ExpressionTree(slot_type=self.slot_type, slot_filter=self.slot_filter, filters=self.filters, expression_complexity=self.expression_complexity, base_expression=self.base_expression, expression_type=self.expression_type, parent=None)
         self.expression_tree.generate()
         return self
 
 
 class ExpressionTree:
-    def __init__(self, slot_type, slot_filter, expression_complexity, base_expression, expression_type, filters, parent=None):
+    def __init__(self, slot_type, slot_filter, expression_complexity, base_expression, expression_type, filters, parent):
         self.slot_type = slot_type
         assert slot_type in ['vector', 'float']
         self.slot_filter = slot_filter
@@ -194,7 +228,7 @@ class ExpressionTree:
         # the expression which this tree starts from; in case that needs to be overwritten (e.g, initialize rules default to a base_expression of 0, whereas step rules default to a base_expression of what is being assigned)
 
         self.expression_type = expression_type
-        assert expression_type in ['initialize', 'step', 'filter']
+        assert expression_type in ['initialize', 'step', 'filter', 'conditional']
         self.filters= filters
 
         if parent is None:
