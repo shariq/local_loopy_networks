@@ -14,10 +14,12 @@ class Harness:
         self.ruleset_generator = ruleset_generator
 
     def sample_node_memory_size(self):
-        self.node_memory_size = random.choice([1, 2, 3, 4, 5])
+        self.node_memory_size = 2 + random.choice([1, 2, 3, 4, 5])
+        # 2 for sent_signal, sent_error
         return self.node_memory_size
     def sample_edge_memory_size(self):
-        self.edge_memory_size = random.choice([1, 2, 3, 4, 5])
+        self.edge_memory_size = 4 + random.choice([1, 2, 3, 4, 5])
+        # 4 for signal, has_signal, error, has_error
         return self.edge_memory_size
 
     def generate(self):
@@ -123,7 +125,7 @@ class Ruleset:
             self.filters.append(filter_expression)
 
         self.conditionals = []
-        # TODO: need default conditionals for signals - any edge has signal, any edge has error, no edge has signal, no edge has error
+        # TODO: need default conditionals for signals - any edge has signal, any edge has error, no edge has signal, no edge has error; combined with sent_signal + sent_error
         for conditional_complexity in self.conditional_complexities:
             conditional_expression = ExpressionTree(slot_type='float', slot_filter=None, expression_complexity=conditional_complexity, base_expression=None, expression_type='conditional', filters=self.filters, parent=None)
             conditional_expression.generate()
@@ -266,8 +268,8 @@ class ExpressionTree:
             for child in node.children:
                 if child not in seen:
                     queue.append(child)
-                else:
-                    raise Exception("this ExpressionTree was not a DAG; it had a cycle!")
+                # else we may be dealing with either a cycle or child sharing (i.e, multiple parents)
+                # cycles are bad but child sharing may be fine at some point in the future
             yield node
 
     def get_complexity(self):

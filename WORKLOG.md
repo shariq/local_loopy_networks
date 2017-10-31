@@ -1,3 +1,26 @@
+# October 30, 2017
+
+October 24 - October 30 involved figuring out the implementation details of generating rules. Turns out formal grammars are good for describing parsers but not for describing how to parametrize over a large number of strings. What I thought would be working by Oct 26/27 is still not working... I think if I didn't get distracted by Halloween parties/hanging out with people I would've been done by now. Something to work on long term: working longer on mentally draining work. I do it when I like it and I'm not distracted. Distractions today are a different class than those of the past.
+
+Anyways I'm pretty close to setting up the first experiment now... Some TODO items are to rename the pip module to local_networks; since the module mostly deals with local updates, and then have a submodule be called loopy where most of the experiments into loopy local update rules happen.
+
+I did write the tests and surrounding testing code which is nice.
+
+Figuring out how to implement filters in a nice way, and thinking of conditionals as a nice way to make update rule look like our backprop model, was pretty important. And this figuring out only happened because I started implementing things and thinking using the universe computer. Need to do this more frequently and sooner in the future.
+
+Still need to hook up operators/filters/conditionals in expression tree generation, enforcing type constraints, enforcing constraints based on expression_type, rendering trees correctly with context for leaves, reusing parts of the ExpressionTree, and using sane probabilities for different groups of expressions. And probably some other things I'm not thinking of.
+
+Once the rules are being generated properly, there's some additional scaffolding which needs to be written in the Model class. The regular backprop stuff but also any scaffolding around how signals are propagated around (not sure yet what this is: maybe just keeping track of sent_signal and has_signal - also we can ignore zero signals with some probability to prevent catastrophic failure).
+
+Then all that stuff needs to be tested to see if it behaves as expected. Some tests could be: trying to implement backprop as a Ruleset, testing if trees generated have the right complexity (right now before implementing increase_complexity correctly they don't, and it's especially important at low complexities where all filters seem to be only one node big), running a randomly generated tree and stepping through the edge/node/signal of a few different nodes to see if they behave as expected including at input/output times. Need to think of better tests than this.
+
+While doing this there will be a lot of tinkering to adjust past ideas to get better rules.
+
+Then we run a big search on Digital Ocean. Need a way to aggregate data; maybe a big DB which can handle O(200) connections. Test with a few nodes before - package in Docker, run on droplet with droplet API. ~$17 gives us 30s * 1,000,000, which means O(1M) - O(10M) rules tested for $17. So maybe spend $17-$50 on initial run. If that fails, run the same test on forward topology graphs with the same randomly generated distribution; if that fails, run the test on loopy topology graphs but with permutations of backprop. If all 3 fail, this is the end of the road. Else, the beginning of a long road of improving those rules, evolving them, applying to RL/LM, optimizing code, etc.
+
+One weird thing about backprop model is nested conditionals. Hopefully this isn't too much of an issue. We could also nest conditionals in our ExpressionTree? Ew - only do this after trying to implement backprop as an ExpressionTree and failing.
+
+
 # October 24, 2017
 
 Oct 16 - 24 has had little to no useful work. I had been trying to think of a good way to parametrize the search space. Time to make a decision... I think what needs to be done is I just need to use the best thing I thought of, in some interesting learning setting(s). Learning setting(s) defined as input/output/topology rules. Initially I want to find a learning rule which works with some sampled Waxman graphs (located in loopy.py); and input/output are sent in one/more obvious ways; and the whole thing is forced to use some signals and error. It would be nice to do everything with one signal, but forget that crazy idea for now: we can easily modify the tests once they exist to try this and other ideas. Much more important to get something kind of OK working, then to make it better through new knowledge gained. Bad pattern I find myself consistently falling into - planning too much instead of doing enough - thankfully I'm not kind of aware of it and can try to consciously prevent it.
@@ -15,6 +38,7 @@ We will also need a nice test harness, which we currently don't have. It must su
 Once this is done, we test by generating a bunch of rules and seeing what the output looks like. We maybe add a few small changes to make the outputs look nicer more often, like limiting string length or making reuse more likely, or changing how vector operations work like throwing away rules which use nonmatching vector lengths (mainly filtering edge memories/using signals), changing probabilities on rules being applied.
 
 Then it's time to sleep.
+
 
 # October 16, 2017
 
