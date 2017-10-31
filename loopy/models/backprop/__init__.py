@@ -178,7 +178,7 @@ class BackpropModel:
             # don't reset weights
 
 
-    def forward(self, input_data):
+    def forward(self, input_data, max_steps=1000):
         # set input data
         for node, signal in enumerate(input_data):
             self.network.read_buffer[node][NODE_SIGNAL_MEMORY_INDEX] = signal
@@ -203,9 +203,9 @@ class BackpropModel:
             if ready:
                 break
             steps += 1
-            if steps > 1000:
-                logger.error('ERROR: ran > 1000 steps in a forward pass without getting an output; probably a bug!')
-                raise Exception('ran > 1000 steps in forward pass without getting an output')
+            if steps > max_steps:
+                logger.error('ERROR: ran > {} steps in a forward pass without getting an output; probably a bug!'.format(max_steps))
+                raise Exception('ran > {} steps in forward pass without getting an output'.format(max_steps))
 
         output = []
 
@@ -215,7 +215,7 @@ class BackpropModel:
         return output
 
 
-    def backward(self, output_data):
+    def backward(self, output_data, max_steps=1000):
         # apply error to the secondary output edges
         # then run step until there's no error left
         for expected_signal, output_node in zip(output_data, self.secondary_output_nodes):
@@ -236,8 +236,18 @@ class BackpropModel:
 
             self.network.read_buffer[output_node][NODE_ERROR_JUST_SENT_INDEX] = 1
 
-        while any(node_buffer[NODE_ERROR_JUST_SENT_INDEX] != 0 for node_buffer in self.network.read_buffer):
+
+        steps = 0
+        while True:
             self.network.step()
+            ready = all(node_buffer[NODE_ERROR_JUST_SENT_INDEX] == 0 for node_buffer in self.network.read_buffer)
+            if ready:
+                break
+            steps += 1
+            if steps > max_steps:
+                logger.error('ERROR: ran > {} steps in a backward pass without getting an output; probably a bug!'.format(max_steps))
+                raise Exception('ran > {} steps in backward pass without getting an output'.format(max_steps))
+            
 
 
     def set_weights(self, weights):

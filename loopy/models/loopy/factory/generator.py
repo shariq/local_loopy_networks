@@ -138,7 +138,7 @@ class Ruleset:
         self.initialize_rules = []
 
         for slot_value, slot_type in zip(slot_values, slot_types):
-            rule = Rule(filters=self.filters, conditionals=self.conditionals, slot_type=slot_type, slot_value=slot_value, expression_complexity=self.sample_initialize_expression_complexity(slot_type), slot_filter_usage_frequency=0.0,  slot_conditional_usage_frequency=0.0, base_expression='float_0', expression_type='initialize')
+            rule = Rule(filters=self.filters, conditionals=self.conditionals, slot_type=slot_type, slot_value=slot_value, expression_complexity=self.sample_initialize_expression_complexity(slot_type), slot_filter_usage_frequency=0.0,  slot_conditional_usage_frequency=0.0, base_expression='leaves.zero', expression_type='initialize')
             rule.generate()
             self.initialize_rules.append(rule)
 

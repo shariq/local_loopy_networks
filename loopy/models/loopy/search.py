@@ -24,7 +24,7 @@ def search_harness():
             harness_code = generator_harness.render()
             model_class = compile_model(harness_code)
 
-            #generator_model = None
+            #generator_harness = None
             #harness_code = 'backprop'
             #from loopy.models.backprop import BackpropModel as model_class
             ## above tests that backprop as a model does in fact work with these checks
