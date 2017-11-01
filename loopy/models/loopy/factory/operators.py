@@ -1,19 +1,21 @@
-from functools import wrap
+from functools import wraps
 import numpy as np
 import math
 import inspect
-
-float_32_dtype = np.dtype('float32')
+import copy
+import random
 
 # operators are the elements of an ExpressionTree which have children
+
+operator_sampler = []
+
+# read leaves.py for an explanation of how operator_sampler works; it does the same thing as leaf_sampler
 
 #############
 # helper functions
 #############
 
-def number_args(func):
-    return len(inspect.signature(func).parameters)
-
+float_32_dtype = np.dtype('float32')
 def np_float_wrapper(func):
     # only use this when you know that the function changes the vector type of an input
     @wraps(func)
@@ -49,39 +51,128 @@ def less_than_or_equal(a, b):
 def equal(a, b):
     return a == b
 
+operator_sampler.append([add, multiply, subtract])
+operator_sampler.append([greater_than_or_equal, less_than_or_equal, equal])
 
 ##############
 # operators which take in a single float or vector; return same type
 ##############
 
-abs = abs
+def abs_(o):
+    return abs(o)
 
-def clip(a):
-    return np.clip(a, -1.0, 1.0)
+def clip(o):
+    return np.clip(o, -1.0, 1.0)
 
-def relu(a):
-    # be careful about not modifying the input array in place!
-    return a * (a > 0)
+def relu(o):
+    # be careful about not modifying the input array in place, like some stack overflow answers say you should!
+    return o * (o > 0)
 
-def negative(a):
-    return -a
+def negative(o):
+    return -o
 
-def sigmoid(a):
-    return np.exp(-np.logaddexp(0, -x))
+def sigmoid(o):
+    return np.exp(-np.logaddexp(0, -o))
 
-tanh = np.tanh
-sin = np.sin
+def tanh(o):
+    return np.tanh(o)
+
+def sin(o):
+    return np.sin(o)
+
+def cos(o):
+    return np.cos(o)
 
 @np_float_wrapper
-def sign(a):
-    return np.sign(a)
+def sign(o):
+    return np.sign(o)
+
+operator_sampler.append([abs_, clip, relu, negative, [sigmoid, tanh, [sin, cos]], sign])
+
+# these next operators are reducers - they force a float output; so if we need a float somewhere from a vector these are helpful; but generally they can be used for any input/output types; they will just do weird stuff (e.g, std of a float is 0.0; all other reducers of float are float itself)
+
+# we have reduce operators defined on two children so that all cross sections of properties are defined - (number_children=2 x returns_float=True) was previously not defined. keeping it low likelihood because it's pretty weird... and let's pretend we need to force the vector inputs of reduce_two_operators to be the same length
+
+def sum_(o):
+    return np.sum(o)
+sum_.returns_float = True
+
+def sum_two(a, b):
+    return np.sum(a) + np.sum(b)
+sum_two.returns_float = True
+
+def max_(o):
+    return np.amax(o)
+max_.returns_float = True
+
+def max_two(a, b):
+    return max([np.amax(a), np.amax(b)])
+max_two.returns_float = True
+
+def min_(o):
+    return np.amin(o)
+min_.returns_float = True
+
+def min_two(a, b):
+    return min([np.amin(a), np.amin(b)])
+min_two.returns_float = True
+
+def mean(o):
+    return np.mean(o)
+mean.returns_float = True
+
+def mean_two(a, b):
+    return float(np.sum(a) + np.sum(b))/(len(a)+len(b))
+mean_two.returns_float = True
+
+def std(o):
+    return np.std(o)
+std.returns_float = True
+
+def std_two(a, b):
+    # allocates a new array; ew
+    return np.std(np.concatenate([a, b]))
+std_two.returns_float = True
+
+reduce_two_operators = [sum_two, [max_two, min_two], [mean_two, std_two]]
+operator_sampler.append([sum_, [max_, min_], [mean, std], reduce_two_operators])
 
 ##############
-# reducing operators; take a vector return a float
+# sampling code
 ##############
 
-sum = np.sum
-max = np.amax
-min = np.amin
-mean = np.mean
-std = np.std
+def get_returns_float(func):
+    return getattr(func, 'returns_float', False)
+
+def get_number_children(func):
+    return len(inspect.signature(func).parameters)
+
+def sample_operator(returns_float=None, number_children=None):
+    # None means don't impose the constraint ; other values mean impose that constraint
+    assert returns_float in [None, True, False]
+    assert number_children in [None, 1, 2]
+
+    def restrict_operator_sampler(suboperator_sampler):
+        return_value = []
+        for e in suboperator_sampler:
+            if isinstance(e, list):
+                subsuboperator_sampler = restrict_operator_sampler(e)
+                if len(subsuboperator_sampler):
+                    return_value.append(subsuboperator_sampler)
+            else:
+                if returns_float is not None and get_returns_float(e) != returns_float:
+                    continue
+                if number_children is not None and get_number_children(e) != number_children:
+                    continue
+                return_value.append(e)
+        return return_value
+
+    restricted_operator_sampler = restrict_operator_sampler(operator_sampler)
+
+    while isinstance(restricted_operator_sampler, list):
+        restricted_operator_sampler = random.choice(restricted_operator_sampler)
+
+    return restricted_operator_sampler
+
+def render(operator):
+    return 'operators.' + operator.__name__

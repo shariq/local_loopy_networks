@@ -1,6 +1,8 @@
 import random
 from collections import defaultdict
 
+import loopy.models.loopy.factory.leaves as leaves
+
 # the way we make an expression of some complexity is to take a blank expression and randomly distort it, and keep doing that until we get our desired length
 # increase_complexity should sample from the right distribution; so adding one node which may increase complexity by too much at once; but it's all approximate anyways so it's fine if it's a bit off
 
@@ -131,9 +133,9 @@ class Ruleset:
             conditional_expression.generate()
             self.conditionals.append(conditional_expression)
 
-        slot_values = ['slot_node_{}'.format(i) for i in range(self.node_memory_size)] + ['slot_signal_0', 'slot_signal_1'] + ['slot_edge_{}'.format(i) for i in range(self.edge_memory_size)]
-        slot_types = ['float'] * self.node_memory_size + ['vector'] * (2 + self.edge_memory_size)
-        # 2 => signal + error vectors on each edge (signal_0 = signal; signal_1 = error)
+        slot_values = ['slot_node_{}'.format(i) for i in range(self.node_memory_size)] + ['slot_edge_{}'.format(i) for i in range(self.edge_memory_size)]
+        slot_base_expressions = [leaves.context_renderer(leaves.node_memory, node_index=i) for i in range(self.node_memory_size)] + [leaves.context_renderer(leaves.edge_memory, edge_index=i) for i in range(self.edge_memory_size)]
+        slot_types = ['float'] * self.node_memory_size + ['vector'] * (self.edge_memory_size)
 
         self.initialize_rules = []
 
@@ -144,10 +146,10 @@ class Ruleset:
 
         self.step_rules = []
 
-        for slot_value, slot_type in zip(slot_values, slot_types):
+        for slot_value, slot_type, slot_base_expression in zip(slot_values, slot_types, slot_base_expressions):
             self.step_rules.append([])
             for _ in range(self.sample_rules_per_slot(slot_type)):
-                rule = Rule(filters=self.filters, conditionals=self.conditionals, slot_type=slot_type, slot_value=slot_value, expression_complexity=self.sample_step_expression_complexity(slot_type), slot_filter_usage_frequency=self.slot_filter_usage_frequency, slot_conditional_usage_frequency=self.slot_conditional_usage_frequency, base_expression=slot_value, expression_type='step')
+                rule = Rule(filters=self.filters, conditionals=self.conditionals, slot_type=slot_type, slot_value=slot_value, expression_complexity=self.sample_step_expression_complexity(slot_type), slot_filter_usage_frequency=self.slot_filter_usage_frequency, slot_conditional_usage_frequency=self.slot_conditional_usage_frequency, base_expression=slot_base_expression, expression_type='step')
                 rule.generate()
                 self.step_rules[-1].append(rule)
 
