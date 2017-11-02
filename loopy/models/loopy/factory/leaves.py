@@ -140,8 +140,7 @@ def sample_leaf(expression_type, leaf_type):
     return restricted_leaf_sampler
 
 
-def sample_rendered_leaf(expression_type, leaf_type, node_memory_size, edge_memory_size):
-    func = sample_leaf(expression_type, leaf_type)
+def render_leaf(func, expression_type, leaf_type, node_memory_size, edge_memory_size):
     parameters = list(inspect.signature(func).parameters)
     if len(parameters) == 0:
         return 'leaves.' + func.__name__ + '()'
@@ -155,3 +154,8 @@ def sample_rendered_leaf(expression_type, leaf_type, node_memory_size, edge_memo
         renderer_kwargs['edge_index'] = random.randint(0, edge_memory_size-1)
     assert len(renderer_kwargs) + 1 == len(parameters), 'could not account for all parameters of this leaf; is it using any nonstandard parameter names?'
     return context_renderer(func, expression_type, **renderer_kwargs)
+
+
+def sample_rendered_leaf(expression_type, leaf_type, node_memory_size, edge_memory_size):
+    func = sample_leaf(expression_type, leaf_type)
+    return render_leaf(func, expression_type, leaf_type, node_memory_size, edge_memory_size)

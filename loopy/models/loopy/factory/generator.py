@@ -1,7 +1,9 @@
 import random
 from collections import defaultdict
+import numpy as np
 
 import loopy.models.loopy.factory.leaves as leaves
+import loopy.models.loopy.factory.operators as operators
 
 # the way we make an expression of some complexity is to take a blank expression and randomly distort it, and keep doing that until we get our desired length
 # increase_complexity should sample from the right distribution; so adding one node which may increase complexity by too much at once; but it's all approximate anyways so it's fine if it's a bit off
@@ -16,11 +18,11 @@ class Harness:
         self.ruleset_generator = ruleset_generator
 
     def sample_node_memory_size(self):
-        self.node_memory_size = 2 + random.choice([1, 2, 3, 4, 5])
+        self.node_memory_size = 2 + random.choice([1, 2, 2, 3, 3, 4, 5])
         # 2 for sent_signal, sent_error
         return self.node_memory_size
     def sample_edge_memory_size(self):
-        self.edge_memory_size = 4 + random.choice([1, 2, 3, 4, 5])
+        self.edge_memory_size = 4 + random.choice([1, 2, 2, 3, 3, 4, 5])
         # 4 for signal, has_signal, error, has_error
         return self.edge_memory_size
 
@@ -95,9 +97,9 @@ class Ruleset:
     def sample_step_expression_complexity(self, slot_type):
         assert slot_type in ['vector', 'float']
         if slot_type == 'vector':
-            return random.choice(list(range(1,6)) + list(range(1,11))*3 + list(range(1,21))*2 + list(range(1,31)))
+            return random.choice(list(range(2,6)) + list(range(5,11))*3 + list(range(5,21))*2 + list(range(5,31)))
         if slot_type == 'float':
-            return random.choice(list(range(1,3)) + list(range(1,6)) + list(range(5,11))*3)
+            return random.choice(list(range(2,6)) + list(range(5,11))*3)
     def sample_initialize_expression_complexity(self, slot_type):
         assert slot_type in ['vector', 'float']
         return random.choice([1, 2, 3])
@@ -122,25 +124,25 @@ class Ruleset:
 
         # TODO: need default filters for signals - has_signal, has_error, not_has_signal, not_has_error
         for filter_complexity in self.filter_complexities:
-            filter_expression = ExpressionTree(slot_type='vector', slot_filter=None, expression_complexity=filter_complexity, base_expression=None, expression_type='filter', filters=[], parent=None)
+            filter_expression = ExpressionTree(slot_type='vector', slot_filter=None, expression_complexity=filter_complexity, base_expression=None, expression_type='filter', ruleset=self, parent=None)
             filter_expression.generate()
             self.filters.append(filter_expression)
 
         self.conditionals = []
         # TODO: need default conditionals for signals - any edge has signal, any edge has error, no edge has signal, no edge has error; combined with sent_signal + sent_error
         for conditional_complexity in self.conditional_complexities:
-            conditional_expression = ExpressionTree(slot_type='float', slot_filter=None, expression_complexity=conditional_complexity, base_expression=None, expression_type='conditional', filters=self.filters, parent=None)
+            conditional_expression = ExpressionTree(slot_type='float', slot_filter=None, expression_complexity=conditional_complexity, base_expression=None, expression_type='conditional', ruleset=self, parent=None)
             conditional_expression.generate()
             self.conditionals.append(conditional_expression)
 
         slot_values = ['slot_node_{}'.format(i) for i in range(self.node_memory_size)] + ['slot_edge_{}'.format(i) for i in range(self.edge_memory_size)]
-        slot_base_expressions = [leaves.context_renderer(leaves.node_memory, node_index=i) for i in range(self.node_memory_size)] + [leaves.context_renderer(leaves.edge_memory, edge_index=i) for i in range(self.edge_memory_size)]
         slot_types = ['float'] * self.node_memory_size + ['vector'] * (self.edge_memory_size)
+        slot_base_expressions = [leaves.context_renderer(leaves.node_memory, 'step', node_index=i) for i in range(self.node_memory_size)] + [leaves.context_renderer(leaves.edge_memory, 'step', edge_index=i) for i in range(self.edge_memory_size)]
 
         self.initialize_rules = []
 
         for slot_value, slot_type in zip(slot_values, slot_types):
-            rule = Rule(filters=self.filters, conditionals=self.conditionals, slot_type=slot_type, slot_value=slot_value, expression_complexity=self.sample_initialize_expression_complexity(slot_type), slot_filter_usage_frequency=0.0,  slot_conditional_usage_frequency=0.0, base_expression='leaves.zero', expression_type='initialize')
+            rule = Rule(ruleset=self, slot_type=slot_type, slot_value=slot_value, expression_complexity=self.sample_initialize_expression_complexity(slot_type), slot_filter_usage_frequency=0.0,  slot_conditional_usage_frequency=0.0, base_expression='leaves.zero', expression_type='initialize')
             rule.generate()
             self.initialize_rules.append(rule)
 
@@ -149,7 +151,7 @@ class Ruleset:
         for slot_value, slot_type, slot_base_expression in zip(slot_values, slot_types, slot_base_expressions):
             self.step_rules.append([])
             for _ in range(self.sample_rules_per_slot(slot_type)):
-                rule = Rule(filters=self.filters, conditionals=self.conditionals, slot_type=slot_type, slot_value=slot_value, expression_complexity=self.sample_step_expression_complexity(slot_type), slot_filter_usage_frequency=self.slot_filter_usage_frequency, slot_conditional_usage_frequency=self.slot_conditional_usage_frequency, base_expression=slot_base_expression, expression_type='step')
+                rule = Rule(ruleset=self, slot_type=slot_type, slot_value=slot_value, expression_complexity=self.sample_step_expression_complexity(slot_type), slot_filter_usage_frequency=self.slot_filter_usage_frequency, slot_conditional_usage_frequency=self.slot_conditional_usage_frequency, base_expression=slot_base_expression, expression_type='step')
                 rule.generate()
                 self.step_rules[-1].append(rule)
 
@@ -181,13 +183,17 @@ class Ruleset:
         if len(expression_tree.children) == 0:
             return expression_tree.operator
         else:
-            return '{operator}({args})'.format(operator=expression_tree.operator, args=', '.join(self.render_expression_tree(child) for child in expression_tree.children))
+            return '{operator}({args})'.format(operator=operators.render(expression_tree.operator), args=', '.join(self.render_expression_tree(child) for child in expression_tree.children))
 
 
 class Rule:
-    def __init__(self, filters, conditionals, slot_type, slot_value, expression_complexity, slot_filter_usage_frequency, slot_conditional_usage_frequency, base_expression, expression_type):
-        self.filters = filters
-        self.conditionals = conditionals
+    def __init__(self, ruleset, slot_type, slot_value, expression_complexity, slot_filter_usage_frequency, slot_conditional_usage_frequency, base_expression, expression_type):
+        self.filters = ruleset.filters
+        self.conditionals = ruleset.conditionals
+
+        self.edge_memory_size = ruleset.edge_memory_size
+        self.node_memory_size = ruleset.node_memory_size
+
         self.slot_type = slot_type
         self.slot_value = slot_value
         self.expression_complexity = expression_complexity
@@ -195,6 +201,10 @@ class Rule:
         self.slot_conditional_usage_frequency = slot_conditional_usage_frequency
         self.base_expression = base_expression
         self.expression_type = expression_type
+
+        self.slot_filter = None
+        self.slot_conditional = None
+        self.expression_tree = None
 
     def generate(self):
         slot_filter = None
@@ -211,13 +221,13 @@ class Rule:
             slot_conditional = random.choice(self.conditionals)
         self.slot_conditional = slot_conditional
 
-        self.expression_tree = ExpressionTree(slot_type=self.slot_type, slot_filter=self.slot_filter, filters=self.filters, expression_complexity=self.expression_complexity, base_expression=self.base_expression, expression_type=self.expression_type, parent=None)
+        self.expression_tree = ExpressionTree(slot_type=self.slot_type, slot_filter=self.slot_filter, ruleset=self, expression_complexity=self.expression_complexity, base_expression=self.base_expression, expression_type=self.expression_type, parent=None)
         self.expression_tree.generate()
         return self
 
 
 class ExpressionTree:
-    def __init__(self, slot_type, slot_filter, expression_complexity, base_expression, expression_type, filters, parent):
+    def __init__(self, slot_type, slot_filter, expression_complexity, base_expression, expression_type, ruleset, parent):
         self.slot_type = slot_type
         assert slot_type in ['vector', 'float']
         self.slot_filter = slot_filter
@@ -227,34 +237,38 @@ class ExpressionTree:
 
         self.expression_complexity = expression_complexity
         # the target expression_complexity: complexity is for now defined as number of nodes in the ExpressionTree, but this may be changed to ignore certain kinds of nodes ()
+        assert expression_complexity > 0
 
         self.base_expression = base_expression
         # the expression which this tree starts from; in case that needs to be overwritten (e.g, initialize rules default to a base_expression of 0, whereas step rules default to a base_expression of what is being assigned)
 
         self.expression_type = expression_type
         assert expression_type in ['initialize', 'step', 'filter', 'conditional']
-        self.filters= filters
+        self.filters = ruleset.filters
+        self.ruleset = ruleset
+        self.edge_memory_size = ruleset.edge_memory_size
+        self.node_memory_size = ruleset.node_memory_size
 
         if parent is None:
             self.parent = None
             self.root = self
+            self.tree_depth = 1
         else:
             self.parent = parent
             self.root = parent.root
+            self.tree_depth = 1
+            traversed_node = self
+            while traversed_node != self.root:
+                traversed_node = traversed_node.parent
+                self.tree_depth += 1
 
         self.children = []
-        self.operator = 'None'
+        self.operator = base_expression or None
 
     def generate(self):
-        if self.base_expression is not None:
-            self.operator = self.base_expression
-            # initialize ExpressionTree with this operator
-        else:
-            self.operator = random.choice(['add', 'multiply'])
-
-        # do some stuff to ensure base_expression is valid: if it needs children, give it children
-
-        while abs(self.get_complexity() - self.expression_complexity) >= 3:
+        while self.get_complexity() < self.expression_complexity or self.get_complexity() > self.expression_complexity + 4:
+            # add some buffer so we don't have to get the exact complexity amount
+            # TODO: try changing that 4 to a 0 and see if it still runs in a reasonable amount of time or if there are pathological cases
             if self.get_complexity() > self.expression_complexity:
                 self.decrease_complexity()
             else:
@@ -275,18 +289,82 @@ class ExpressionTree:
             yield node
 
     def get_complexity(self):
+        if self.operator is None:
+            # uninitialized ExpressionTree has complexity=0
+            return 0
+        # below line includes self, so leaf complexity is 1, not 0
         return len(list(self.traverse_nodes()))
 
     def increase_complexity(self):
-        nodes = list(self.traverse_nodes())
-        childless_nodes = [node for node in nodes if len(node.children) < 2]
-        node_to_distort = random.choice(childless_nodes)
-        new_node = ExpressionTree(slot_type=self.slot_type, slot_filter=self.slot_filter, expression_complexity=1, base_expression=None, expression_type=self.expression_type, filters=self.filters, parent=self)
-        new_node.generate()
-        node_to_distort.children.append(new_node)
+        # if we have no children and expression_complexity is 1-3, we know what kind of node we need to be
+        # if expression_complexity is higher than 3, we need to select a random leaf node, delete it, and replace it with a node of complexity=2 or 3
+        # along the way we also need to handle changing filters, picking types, constraining operators by type
+
+        def adjust_node(number_children, node=self, child_complexity=1):
+            # initializes this node and gives it this many children, each with complexity of 1 (i.e, a leaf)
+            # 0 children = make it a leaf
+            assert number_children in [0, 1, 2]
+
+            assert node.operator is None or len(node.children) == 0
+            # for now, let's not try adjusting nodes with children since keeping track of references is tricky
+
+            # assertions make sure this node hasn't been somehow already initialized
+            if number_children == 0:
+                # TODO: figure out how all the weird type, filter, and base_expression stuff will work
+                leaf_type = node.slot_type
+                if leaf_type is None:
+                    leaf_type = random.choice(['vector', 'float'])
+                node.operator = leaves.sample_rendered_leaf(node.expression_type, leaf_type, self.node_memory_size, self.edge_memory_size)
+            else:
+                # TODO: again - expression_type, slot_type, filter, base_expression interaction with args to constructors here, and some probability of adjusting those; also is_reducer
+                is_reducer = None
+                node.operator = operators.sample_operator(is_reducer=is_reducer, number_children=number_children)
+                for child in range(number_children):
+                    # TODO: here is where we can adjust those type things found in node with some small probability
+                    child_node = ExpressionTree(slot_type=node.slot_type, slot_filter=node.slot_filter, expression_complexity=child_complexity, base_expression=None, expression_type=node.expression_type, ruleset=node.ruleset, parent=node)
+                    child_node.generate()
+                    node.children.append(child_node)
+
+
+        if self.operator == None:
+            # this is when we initialize an ExpressionTree
+            # we don't want to create unnecessary complexity; and we want to be able to control from outside how deep it is when it gets initialized
+            if self.expression_complexity in [1, 2]:
+                # either this node needs to be a leaf, or a single child operator
+                adjust_node(self.expression_complexity - 1)
+            elif self.expression_complexity == 3:
+                # we have to be either a single child operator with a child which is a single child operator which has a leaf node, or a two child operator with two leaf nodes
+                number_children = random.choice([1, 2])
+                if number_children == 1:
+                    child_complexity = 2
+                else:
+                    child_complexity = 1
+                adjust_node(number_children=number_children, child_complexity=child_complexity)
+            else:
+                # pick randomly out of leaf, single child operator, double child operator
+                number_children = random.choice([0, 1, 2])
+                adjust_node(number_children=number_children)
+        else:
+            # this node already was defined previously, and now we want to increase its complexity
+            # if its a leaf node, turn it into an operator node - once this happens we should just ignore or adjust its expression_complexity
+            # if its an operator node, call this method recursively on one of the leaf nodes
+            is_leaf_node = len(self.children) == 0
+            if is_leaf_node:
+                number_children = random.choice([1, 2])
+                child_complexity = random.choice([1, 2])
+                adjust_node(number_children=number_children, child_complexity=child_complexity)
+            else:
+                descendants = list(self.traverse_nodes())
+                leaf_nodes = [node for node in descendants if len(node.children) == 0]
+
+                # we need to weight sampling by depth of the descendants, otherwise we have very high likelihood of unbalanced trees
+                leaf_weights = [1.e9/leaf_node.tree_depth for leaf_node in leaf_nodes]
+                leaf_weights = np.array(leaf_weights) / sum(leaf_weights)
+
+                node_to_adjust = np.random.choice(leaf_nodes, 1, p=leaf_weights)[0]
+
+                node_to_adjust.increase_complexity()
 
     def decrease_complexity(self):
-        nodes = list(self.traverse_nodes())
-        leaf_nodes = [node for node in nodes if len(node.children) == 0]
-        node_to_delete = random.choice(leaf_nodes)
-        node_to_delete.parent.children.remove(node_to_delete)
+        # for now not necessary
+        raise Exception(NotImplemented)

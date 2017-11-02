@@ -1,3 +1,35 @@
+# November 2, 2017
+
+Did not hit goal again, need to sleep early to wake up early.
+
+Pretty close to having something, only need to implement filter/slot_type/expression_type/base_expression/is_reducer/number_children logic/operator_input_type (operator_input_type hasn't been defined yet but probably should be; we should let the operator decide what kind of input it wants) and also all the code for training, forward pass, backward pass, etc - this should be done in a regular class which is then subclassed by Model.
+
+The way the type stuff will work is... we come up with a list of constraints.
+- reducers have to take in vectors
+- much higher likelihood for a single child op to take in a vector than a float
+- generally we want to take in vectors more than floats, maybe 2:1
+- two child op can have one child randomly be float and other be vector
+- make sure leaves which require a vector end up going to an op which expects a vector (op decides before making the leaf)
+- if we are the root and assigning to a vector, we should definitely output a vector and not a float (meaning not something which is actually a float). except for initialize expressions, then outputting a float is fine.
+- if we are the root and this is a conditional expression, it needs to output a float. the float is tested for being above 0 as "true". this is literally crazy because of how big it makes the search space
+
+The way the filter stuff will work is...
+- if the output type of an expression is a float, it doesn't have a filter
+- filter is inherited from parent operation
+- if filter is None and expression returns a vector, then there's some probability with which filter gets selected
+- if filter has a value and expression returns a vector, it has to stay the same in all children, except float children
+
+The way the base_expression will work is...
+- some P(base_expression), sampled from [0.25, 0.5] * 10, [0.0, 0.25] * 1 for each rule
+- ends up being used in a leaf with this P; base expression is not for an operator (filter is defined differently and not part of base_expression - it must be used because of slot_filter of root)
+
+Note: always support logic being run on root of tree which has parent=None
+
+After implementing this, generate a large number of rules and find dumb stuff. Make sure to consider the full context in which it is dumb (expression_type, root/child, tree_depth, slot_type, filter, is_reducer, number_children, operator_input_type, ...)
+
+Then of course there's the question of actually running this on 200 machines... Would be nice to just have a DB which supports 200 incoming connections of 10MB/s, but not sure how realistic that is (ethernet capacity). 
+
+
 # October 30, 2017
 
 October 24 - October 30 involved figuring out the implementation details of generating rules. Turns out formal grammars are good for describing parsers but not for describing how to parametrize over a large number of strings. What I thought would be working by Oct 26/27 is still not working... I think if I didn't get distracted by Halloween parties/hanging out with people I would've been done by now. Something to work on long term: working longer on mentally draining work. I do it when I like it and I'm not distracted. Distractions today are a different class than those of the past.

@@ -91,65 +91,61 @@ operator_sampler.append([abs_, clip, relu, negative, [sigmoid, tanh, [sin, cos]]
 
 # these next operators are reducers - they force a float output; so if we need a float somewhere from a vector these are helpful; but generally they can be used for any input/output types; they will just do weird stuff (e.g, std of a float is 0.0; all other reducers of float are float itself)
 
-# we have reduce operators defined on two children so that all cross sections of properties are defined - (number_children=2 x returns_float=True) was previously not defined. keeping it low likelihood because it's pretty weird... and let's pretend we need to force the vector inputs of reduce_two_operators to be the same length
+# we have reduce operators defined on two children so that all cross sections of properties are defined - (number_children=2 x is_reducer=True) was previously not defined. keeping it low likelihood because it's pretty weird... and let's pretend we need to force the vector inputs of reduce_two_operators to be the same length
 
 def sum_(o):
     return np.sum(o)
-sum_.returns_float = True
+sum_.is_reducer = True
 
 def sum_two(a, b):
     return np.sum(a) + np.sum(b)
-sum_two.returns_float = True
+sum_two.is_reducer = True
 
 def max_(o):
     return np.amax(o)
-max_.returns_float = True
+max_.is_reducer = True
 
 def max_two(a, b):
     return max([np.amax(a), np.amax(b)])
-max_two.returns_float = True
+max_two.is_reducer = True
 
 def min_(o):
     return np.amin(o)
-min_.returns_float = True
+min_.is_reducer = True
 
 def min_two(a, b):
     return min([np.amin(a), np.amin(b)])
-min_two.returns_float = True
+min_two.is_reducer = True
 
 def mean(o):
     return np.mean(o)
-mean.returns_float = True
+mean.is_reducer = True
 
 def mean_two(a, b):
     return float(np.sum(a) + np.sum(b))/(len(a)+len(b))
-mean_two.returns_float = True
+mean_two.is_reducer = True
 
 def std(o):
     return np.std(o)
-std.returns_float = True
+std.is_reducer = True
 
-def std_two(a, b):
-    # allocates a new array; ew
-    return np.std(np.concatenate([a, b]))
-std_two.returns_float = True
-
-reduce_two_operators = [sum_two, [max_two, min_two], [mean_two, std_two]]
-operator_sampler.append([sum_, [max_, min_], [mean, std], reduce_two_operators])
+reduce_two_operators = [sum_two, [max_two, min_two], [mean_two]]
+# reduce_two_operators need to be low likelihood since they get rid of information in two entire child trees
+operator_sampler.append([sum_, [max_, min_], [mean, std]] * 20 + reduce_two_operators)
 
 ##############
 # sampling code
 ##############
 
-def get_returns_float(func):
-    return getattr(func, 'returns_float', False)
+def get_is_reducer(func):
+    return getattr(func, 'is_reducer', False)
 
 def get_number_children(func):
     return len(inspect.signature(func).parameters)
 
-def sample_operator(returns_float=None, number_children=None):
+def sample_operator(is_reducer=None, number_children=None):
     # None means don't impose the constraint ; other values mean impose that constraint
-    assert returns_float in [None, True, False]
+    assert is_reducer in [None, True, False]
     assert number_children in [None, 1, 2]
 
     def restrict_operator_sampler(suboperator_sampler):
@@ -160,7 +156,7 @@ def sample_operator(returns_float=None, number_children=None):
                 if len(subsuboperator_sampler):
                     return_value.append(subsuboperator_sampler)
             else:
-                if returns_float is not None and get_returns_float(e) != returns_float:
+                if is_reducer is not None and get_is_reducer(e) != is_reducer:
                     continue
                 if number_children is not None and get_number_children(e) != number_children:
                     continue

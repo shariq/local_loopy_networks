@@ -2,6 +2,8 @@ import loopy
 import logging
 logger = logging.getLogger()
 
+import pickle
+
 from loopy.models.loopy.checks import all_checks, all_checks_accuracy_requirements
 
 from types import ModuleType
