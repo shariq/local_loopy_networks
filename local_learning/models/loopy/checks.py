@@ -1,7 +1,7 @@
 # all checks return a float from 0 to 1, saying how well this check did
 # we maybe keep track of all checks performed, and then can query by different checks
 import traceback
-import loopy
+import local_learning
 import logging
 logger = logging.getLogger()
 

@@ -1,3 +1,5 @@
+(note: this is out of date, see WORKLOG and code for more up to date spec)
+
 REMINDER: you can reuse parts of the ExpressionTree in itself to make the distribution of complex ExpressionTrees nicer (i.e, if we use node_memory[0] > edge_memory[0] * 2 then it should be somewhat likely we use it multiple times and not just once)
 
 number of signal channels

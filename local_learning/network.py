@@ -3,11 +3,11 @@ from collections import defaultdict
 import numpy as np
 import math
 
-import loopy
+import local_learning
 import logging
 logger = logging.getLogger()
 
-from loopy.graph.tools import undirect_adjacency_dict
+from local_learning.graph.tools import undirect_adjacency_dict
 
 class Network:
     def __init__(self, in_adjacency_dict, node_memory_size=1, edge_memory_size=1, step_rule=None):

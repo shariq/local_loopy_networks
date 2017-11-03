@@ -1,6 +1,6 @@
 import numpy as np
 import random
-import loopy
+import local_learning
 
 import logging
 logger = logging.getLogger()
@@ -24,8 +24,8 @@ EDGE_HAS_ERROR_INDEX = 3
 EDGE_WEIGHT_INDEX = 4
 
 
-from loopy.graph.feedforward import make_feedforward_adjacency_dict
-from loopy.network import Network
+from local_learning.graph.feedforward import make_feedforward_adjacency_dict
+from local_learning.network import Network
 
 
 def backprop_initialize_rule(node_memory_size, edge_memory_size, edges):

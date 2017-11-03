@@ -2,8 +2,8 @@ import random
 from collections import defaultdict
 import numpy as np
 
-import loopy.models.loopy.factory.leaves as leaves
-import loopy.models.loopy.factory.operators as operators
+import local_learning.models.loopy.factory.leaves as leaves
+import local_learning.models.loopy.factory.operators as operators
 
 # the way we make an expression of some complexity is to take a blank expression and randomly distort it, and keep doing that until we get our desired length
 # increase_complexity should sample from the right distribution; so adding one node which may increase complexity by too much at once; but it's all approximate anyways so it's fine if it's a bit off

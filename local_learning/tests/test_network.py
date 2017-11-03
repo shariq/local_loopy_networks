@@ -9,10 +9,10 @@ from collections import defaultdict
 import logging
 logger = logging.getLogger()
 
-from loopy.network import Network
+from local_learning.network import Network
 # Network(in_adjacency_dict, node_memory_size=1, edge_memory_size=2)
-from loopy.graph.waxman import make_waxman_adjacency_dict
-from loopy.graph.loop import make_loop_adjacency_dict
+from local_learning.graph.waxman import make_waxman_adjacency_dict
+from local_learning.graph.loop import make_loop_adjacency_dict
 
 unittest.run_fast = False
 

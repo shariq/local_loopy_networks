@@ -10,7 +10,7 @@ from collections import defaultdict
 import logging
 logger = logging.getLogger()
 
-import loopy.models.backprop as backprop
+import local_learning.models.backprop as backprop
 BackpropModel = backprop.BackpropModel
 
 class TestBackprop(unittest.TestCase):

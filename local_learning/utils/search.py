@@ -1,12 +1,12 @@
 import argparse
-import loopy
+import local_learning
 import logging
 from types import ModuleType
 
 logger = logging.getLogger()
 
-from loopy.models.loopy.checks import all_checks, all_checks_accuracy_requirements
-import loopy.models.loopy.factory.generator as generator
+from local_learning.models.loopy.checks import all_checks, all_checks_accuracy_requirements
+import local_learning.models.loopy.factory.generator as generator
 
 
 def compile_model(harness_code, class_name='Model', module_name='harness_module'):
@@ -27,7 +27,7 @@ def search_harness():
 
             '''generator_harness = None
             harness_code = 'backprop'
-            from loopy.models.backprop import BackpropModel as model_class
+            from local_learning.models.backprop import BackpropModel as model_class
             # above tests that backprop as a model does in fact work with these checks'''
         except Exception as e:
             logger.error(e, exc_info=True)
