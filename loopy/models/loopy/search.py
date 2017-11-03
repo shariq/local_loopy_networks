@@ -1,17 +1,16 @@
+import argparse
 import loopy
 import logging
+from types import ModuleType
+
 logger = logging.getLogger()
 
-import pickle
-
 from loopy.models.loopy.checks import all_checks, all_checks_accuracy_requirements
-
-from types import ModuleType
 import loopy.models.loopy.factory.generator as generator
 
 
 def compile_model(harness_code, class_name='Model', module_name='harness_module'):
-    print(harness_code)
+    logger.debug(harness_code)
     compiled = compile(harness_code, '', 'exec')
     module = ModuleType(module_name)
     exec(compiled, module.__dict__)
@@ -19,17 +18,17 @@ def compile_model(harness_code, class_name='Model', module_name='harness_module'
 
 
 def search_harness():
-    while True:
+    for i in range(100):
         try:
             generator_harness = generator.Harness()
             generator_harness.generate()
             harness_code = generator_harness.render()
             model_class = compile_model(harness_code)
 
-            #generator_harness = None
-            #harness_code = 'backprop'
-            #from loopy.models.backprop import BackpropModel as model_class
-            ## above tests that backprop as a model does in fact work with these checks
+            '''generator_harness = None
+            harness_code = 'backprop'
+            from loopy.models.backprop import BackpropModel as model_class
+            # above tests that backprop as a model does in fact work with these checks'''
         except Exception as e:
             logger.error(e, exc_info=True)
             continue
@@ -39,6 +38,8 @@ def search_harness():
                 check_accuracy = check(model_class)
                 if check_accuracy >= accuracy_requirement:
                     results[check_index] = check_accuracy
+                    # break
+                    ## useful for timing
                 else:
                     break
             except Exception as e:
@@ -48,7 +49,17 @@ def search_harness():
 
 
 if __name__ == '__main__':
-    logger.setLevel(logging.DEBUG)
+    parser = argparse.ArgumentParser(description='Run checks on randomly generated RuleSets.')
+    parser.add_argument('--verbose', '-v', action='count', default=0)
+    args = parser.parse_args()
+
+    if args.verbose == 0:
+        logger.setLevel(logging.CRITICAL)
+    elif args.verbose == 1:
+        logger.setLevel(logging.INFO)
+    elif args.verbose > 1:
+        logger.setLevel(logging.DEBUG)
+
     for _, code, results in search_harness():
         total_score = sum(results) / len(results)
         logger.info('{} got score {} with results {}'.format(code[:200].replace('\n', '\\n'), total_score, results))

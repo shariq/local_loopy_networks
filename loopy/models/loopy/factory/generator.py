@@ -131,11 +131,12 @@ class Ruleset:
 
         self.filters = []
 
+        temp_filters = []
         # TODO: need default filters for signals - has_signal, has_error, not_has_signal, not_has_error
         for filter_complexity in self.filter_complexities:
             filter_expression = ExpressionTree(slot_type='vector', slot_filter=None, expression_complexity=filter_complexity, base_expression=None, expression_type='filter', ruleset=self, parent=None)
             filter_expression.generate()
-            self.filters.append(filter_expression)
+            temp_filters.append(filter_expression)
 
         self.conditionals = []
         # TODO: need default conditionals for signals - any edge has signal, any edge has error, no edge has signal, no edge has error; combined with sent_signal + sent_error
@@ -143,6 +144,8 @@ class Ruleset:
             conditional_expression = ExpressionTree(slot_type='float', slot_filter=None, expression_complexity=conditional_complexity, base_expression=None, expression_type='conditional', ruleset=self, parent=None)
             conditional_expression.generate()
             self.conditionals.append(conditional_expression)
+
+        self.filters = temp_filters
 
         slot_values = ['slot_node_{}'.format(i) for i in range(self.node_memory_size)] + ['slot_edge_{}'.format(i) for i in range(self.edge_memory_size)]
         slot_types = ['float'] * self.node_memory_size + ['vector'] * (self.edge_memory_size)
@@ -347,7 +350,7 @@ class ExpressionTree:
                             if node.slot_filter is None:
                                 # with some random chance give child a filter
                                 # this means the child's return value will get "blown up" into the full vector length after being returned by the child
-                                if random.random() < node.ruleset.filter_break_frequency:
+                                if random.random() < node.ruleset.filter_break_frequency and node.filters:
                                     child_slot_filter = random.choice(node.filters)
                             else:
                                 # with some random chance, remove the filter from the child: so this parent op when receiving the input from the child will actually select from a larger vector and drop most of the numbers

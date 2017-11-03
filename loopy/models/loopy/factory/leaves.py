@@ -3,6 +3,7 @@ import math
 import inspect
 import copy
 import random
+from functools import lru_cache
 
 
 # leaves are the elements of an ExpressionTree which cannot have children
@@ -36,7 +37,7 @@ def node_memory(context, node_index):
 node_memory.requires_step = True
 
 
-leaf_sampler.append([edge_memory, node_memory])
+leaf_sampler.append((edge_memory, node_memory))
 
 ##############
 # leaves which can run in step/initialize
@@ -57,7 +58,7 @@ def uniform(context, leaf_type):
     return np.random.uniform(-1, 1, size=number_edges)
 
 
-leaf_sampler.append([gaussian, uniform])
+leaf_sampler.append((gaussian, uniform))
 
 ###############
 # leaves which don't take arguments/context
@@ -72,7 +73,7 @@ def point_one():return 0.1
 def point_zero_one():return 0.01
 def point_zero_zero_one():return 0.001
 
-leaf_sampler.append([[one, zero, minus_one], [one, zero, minus_one, two, minus_two, point_one, point_zero_one, point_zero_zero_one]])
+leaf_sampler.append(((one, zero, minus_one), (one, zero, minus_one, two, minus_two, point_one, point_zero_one, point_zero_zero_one)))
 
 
 #####################
@@ -111,28 +112,32 @@ def get_requires_step(leaf):
     return getattr(leaf, 'requires_step', False)
 
 
+leaf_sampler = tuple(leaf_sampler)
+
+@lru_cache(maxsize=1000, typed=False)
+def restrict_leaf_sampler(subleaf_sampler, requires_step, requires_vector):
+    return_value = []
+    for e in subleaf_sampler:
+        if isinstance(e, list) or isinstance(e, tuple):
+            subsubleaf_sampler = restrict_leaf_sampler(e, requires_step, requires_vector)
+            if len(subsubleaf_sampler):
+                return_value.append(subsubleaf_sampler)
+        else:
+            if requires_step is not None and get_requires_step(e) != requires_step:
+                continue
+            if requires_vector is not None and get_requires_vector(e) != requires_vector:
+                continue
+            return_value.append(e)
+    return tuple(return_value)
+
+
 def sample_leaf(requires_step=None, requires_vector=None):
     assert requires_step in [None, True, False]
     assert requires_vector in [None, True, False]
-    
-    def restrict_leaf_sampler(subleaf_sampler):
-        return_value = []
-        for e in subleaf_sampler:
-            if isinstance(e, list):
-                subsubleaf_sampler = restrict_leaf_sampler(e)
-                if len(subsubleaf_sampler):
-                    return_value.append(subsubleaf_sampler)
-            else:
-                if requires_step is not None and get_requires_step(e) != requires_step:
-                    continue
-                if requires_vector is not None and get_requires_vector(e) != requires_vector:
-                    continue
-                return_value.append(e)
-        return return_value
 
-    restricted_leaf_sampler = restrict_leaf_sampler(leaf_sampler)
+    restricted_leaf_sampler = restrict_leaf_sampler(leaf_sampler, requires_step, requires_vector)
 
-    while isinstance(restricted_leaf_sampler, list):
+    while isinstance(restricted_leaf_sampler, list) or isinstance(restricted_leaf_sampler, tuple):
         restricted_leaf_sampler = random.choice(restricted_leaf_sampler)
 
     return restricted_leaf_sampler
