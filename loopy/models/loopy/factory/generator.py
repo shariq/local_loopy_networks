@@ -193,6 +193,8 @@ class Ruleset:
 
 class Rule:
     def __init__(self, ruleset, slot_type, slot_value, expression_complexity, slot_filter_usage_frequency, slot_conditional_usage_frequency, base_expression, expression_type):
+        self.ruleset = ruleset
+
         self.filters = ruleset.filters
         self.conditionals = ruleset.conditionals
 
@@ -226,7 +228,7 @@ class Rule:
             slot_conditional = random.choice(self.conditionals)
         self.slot_conditional = slot_conditional
 
-        self.expression_tree = ExpressionTree(slot_type=self.slot_type, slot_filter=self.slot_filter, ruleset=self, expression_complexity=self.expression_complexity, base_expression=self.base_expression, expression_type=self.expression_type, parent=None)
+        self.expression_tree = ExpressionTree(slot_type=self.slot_type, slot_filter=self.slot_filter, ruleset=self.ruleset, expression_complexity=self.expression_complexity, base_expression=self.base_expression, expression_type=self.expression_type, parent=None)
         self.expression_tree.generate()
         return self
 
@@ -268,7 +270,7 @@ class ExpressionTree:
                 self.tree_depth += 1
 
         self.children = []
-        self.operator = base_expression or None
+        self.operator = None
 
     def generate(self):
         while self.get_complexity() < self.expression_complexity or self.get_complexity() > self.expression_complexity + 4:
@@ -316,18 +318,15 @@ class ExpressionTree:
 
             # assertions make sure this node hasn't been somehow already initialized
             if number_children == 0:
-                # TODO: figure out how all the weird type, filter, and base_expression stuff will work
                 leaf_type = node.slot_type
                 if leaf_type is None:
                     leaf_type = random.choice(['vector', 'vector', 'float'])
                 base_expression_type = node.root.slot_type
                 if node.base_expression is not None and base_expression_type == leaf_type and random.random() < node.ruleset.base_expression_usage_frequency:
-                    leaf_type = base_expression_type
                     node.operator = node.base_expression
                 else:
                     node.operator = leaves.sample_rendered_leaf(node.expression_type, leaf_type, self.node_memory_size, self.edge_memory_size)
             else:
-                # TODO: again - expression_type, slot_type, filter, base_expression interaction with args to constructors here, and some probability of adjusting those; also is_reducer
                 is_reducer = None
                 child_slot_types = [random.choice(['vector', 'vector', 'float']) for _ in range(number_children)]
                 node.operator = operators.sample_operator(is_reducer=is_reducer, number_children=number_children)
@@ -352,7 +351,7 @@ class ExpressionTree:
                                             slot_filter = traversed_node.slot_filter
                                             break
                                         traversed_node = traversed_node.parent
-                                if slot_filter is None:
+                                if slot_filter is None and node.filters:
                                     slot_filter = random.choice(node.filters)
                             else:
                                 # use no slot_filter
@@ -396,7 +395,7 @@ class ExpressionTree:
                 leaf_nodes = [node for node in descendants if len(node.children) == 0]
 
                 # we need to weight sampling by depth of the descendants, otherwise we have very high likelihood of unbalanced trees
-                leaf_weights = [1.e9/leaf_node.tree_depth for leaf_node in leaf_nodes]
+                leaf_weights = [1.e9**(-leaf_node.tree_depth) for leaf_node in leaf_nodes]
                 leaf_weights = np.array(leaf_weights) / sum(leaf_weights)
 
                 node_to_adjust = np.random.choice(leaf_nodes, 1, p=leaf_weights)[0]

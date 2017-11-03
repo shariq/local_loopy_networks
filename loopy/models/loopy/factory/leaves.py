@@ -111,12 +111,10 @@ def get_requires_step(leaf):
     return getattr(leaf, 'requires_step', False)
 
 
-def sample_leaf(expression_type, leaf_type):
-    assert expression_type in ['step', 'initialize', 'filter', 'conditional']
-    assert leaf_type in ['float', 'vector']
-    step_only_allowed = expression_type != 'initialize'
-    vector_allowed = leaf_type == 'vector'
-
+def sample_leaf(requires_step=None, requires_vector=None):
+    assert requires_step in [None, True, False]
+    assert requires_vector in [None, True, False]
+    
     def restrict_leaf_sampler(subleaf_sampler):
         return_value = []
         for e in subleaf_sampler:
@@ -125,9 +123,9 @@ def sample_leaf(expression_type, leaf_type):
                 if len(subsubleaf_sampler):
                     return_value.append(subsubleaf_sampler)
             else:
-                if not step_only_allowed and get_requires_step(e):
+                if requires_step is not None and get_requires_step(e) != requires_step:
                     continue
-                if not vector_allowed and get_requires_vector(e):
+                if requires_vector is not None and get_requires_vector(e) != requires_vector:
                     continue
                 return_value.append(e)
         return return_value
@@ -157,5 +155,30 @@ def render_leaf(func, expression_type, leaf_type, node_memory_size, edge_memory_
 
 
 def sample_rendered_leaf(expression_type, leaf_type, node_memory_size, edge_memory_size):
-    func = sample_leaf(expression_type, leaf_type)
+    assert expression_type in ['step', 'initialize', 'filter', 'conditional']
+    assert leaf_type in ['float', 'vector']
+
+    requires_step = None
+    requires_vector = None
+
+    if expression_type == 'filter' or expression_type == 'conditional':
+        requires_step = random.choice([True, True, True, True, False])
+
+    if expression_type == 'step':
+        requires_step = random.choice([True, False])
+
+    if expression_type == 'initialize':
+        requires_step = False
+
+    if leaf_type == 'float':
+        requires_vector = False
+
+    if leaf_type == 'vector':
+        requires_vector = random.choice([True, False])
+
+    if requires_vector and not requires_step:
+        # don't have any such operations defined currently
+        requires_vector = False
+
+    func = sample_leaf(requires_step, requires_vector)
     return render_leaf(func, expression_type, leaf_type, node_memory_size, edge_memory_size)
