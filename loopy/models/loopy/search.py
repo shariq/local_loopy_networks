@@ -18,7 +18,7 @@ def compile_model(harness_code, class_name='Model', module_name='harness_module'
 
 
 def search_harness():
-    for i in range(100):
+    while True:
         try:
             generator_harness = generator.Harness()
             generator_harness.generate()
