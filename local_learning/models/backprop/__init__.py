@@ -37,7 +37,7 @@ def backprop_initialize_rule(node_memory_size, edge_memory_size, edges):
     node_buffer[node_memory_size + EDGE_HAS_SIGNAL_INDEX::edge_memory_size] = 0
     node_buffer[node_memory_size + EDGE_ERROR_INDEX::edge_memory_size] = 0.0
     node_buffer[node_memory_size + EDGE_HAS_ERROR_INDEX::edge_memory_size] = 0
-    node_buffer[node_memory_size + EDGE_WEIGHT_INDEX::edge_memory_size] = random.gauss(0, 0.03)
+    node_buffer[node_memory_size + EDGE_WEIGHT_INDEX::edge_memory_size] = np.random.normal(size=edges) * 0.03
     return node_buffer
 
 
@@ -247,7 +247,7 @@ class BackpropModel:
             if steps > max_steps:
                 logger.error('ERROR: ran > {} steps in a backward pass without getting an output; probably a bug!'.format(max_steps))
                 raise Exception('ran > {} steps in backward pass without getting an output'.format(max_steps))
-            
+
 
 
     def set_weights(self, weights):
