@@ -6,7 +6,6 @@ Pretty close to having something, only need to implement filter/slot_type/expres
 
 The way the type stuff will work is... we come up with a list of constraints.
 - reducers have to take in vectors
-- much higher likelihood for a single child op to take in a vector than a float
 - generally we want to take in vectors more than floats, maybe 2:1
 - two child op can have one child randomly be float and other be vector
 - make sure leaves which require a vector end up going to an op which expects a vector (op decides before making the leaf)
@@ -27,7 +26,7 @@ Note: always support logic being run on root of tree which has parent=None
 
 After implementing this, generate a large number of rules and find dumb stuff. Make sure to consider the full context in which it is dumb (expression_type, root/child, tree_depth, slot_type, filter, is_reducer, number_children, operator_input_type, ...)
 
-Then of course there's the question of actually running this on 200 machines... Would be nice to just have a DB which supports 200 incoming connections of 10MB/s, but not sure how realistic that is (ethernet capacity). 
+Then of course there's the question of actually running this on 200 machines... Would be nice to just have a DB which supports 200 incoming connections of 10MB/s, but not sure how realistic that is (ethernet capacity).
 
 
 # October 30, 2017

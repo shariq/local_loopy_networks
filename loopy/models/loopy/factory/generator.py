@@ -109,6 +109,9 @@ class Ruleset:
     def sample_slot_conditional_usage_frequency(self):
         self.slot_conditional_usage_frequency = random.random()
         return self.slot_conditional_usage_frequency
+    def sample_base_expression_usage_frequency(self):
+        self.base_expression_usage_frequency = random.random() * 0.25
+        return self.base_expression_usage_frequency
 
     def generate(self):
         self.sample_number_filters()
@@ -119,6 +122,8 @@ class Ruleset:
 
         self.sample_slot_filter_usage_frequency()
         self.sample_slot_conditional_usage_frequency()
+
+        self.sample_base_expression_usage_frequency()
 
         self.filters = []
 
@@ -142,7 +147,7 @@ class Ruleset:
         self.initialize_rules = []
 
         for slot_value, slot_type in zip(slot_values, slot_types):
-            rule = Rule(ruleset=self, slot_type=slot_type, slot_value=slot_value, expression_complexity=self.sample_initialize_expression_complexity(slot_type), slot_filter_usage_frequency=0.0,  slot_conditional_usage_frequency=0.0, base_expression='leaves.zero', expression_type='initialize')
+            rule = Rule(ruleset=self, slot_type=slot_type, slot_value=slot_value, expression_complexity=self.sample_initialize_expression_complexity(slot_type), slot_filter_usage_frequency=0.0,  slot_conditional_usage_frequency=0.0, base_expression='leaves.zero()', expression_type='initialize')
             rule.generate()
             self.initialize_rules.append(rule)
 
@@ -268,7 +273,7 @@ class ExpressionTree:
     def generate(self):
         while self.get_complexity() < self.expression_complexity or self.get_complexity() > self.expression_complexity + 4:
             # add some buffer so we don't have to get the exact complexity amount
-            # TODO: try changing that 4 to a 0 and see if it still runs in a reasonable amount of time or if there are pathological cases
+            # TODO: try changing that 4 to a 0 and see if it still runs in a reasonable amount of time or if there are pathological cases - WARNING - this will most likely not work when decrease_complexity raises exceptions, as is currently the case
             if self.get_complexity() > self.expression_complexity:
                 self.decrease_complexity()
             else:
@@ -307,21 +312,54 @@ class ExpressionTree:
 
             assert node.operator is None or len(node.children) == 0
             # for now, let's not try adjusting nodes with children since keeping track of references is tricky
+            # but it's ok to take a leaf node and give it children
 
             # assertions make sure this node hasn't been somehow already initialized
             if number_children == 0:
                 # TODO: figure out how all the weird type, filter, and base_expression stuff will work
                 leaf_type = node.slot_type
                 if leaf_type is None:
-                    leaf_type = random.choice(['vector', 'float'])
-                node.operator = leaves.sample_rendered_leaf(node.expression_type, leaf_type, self.node_memory_size, self.edge_memory_size)
+                    leaf_type = random.choice(['vector', 'vector', 'float'])
+                base_expression_type = node.root.slot_type
+                if node.base_expression is not None and base_expression_type == leaf_type and random.random() < node.ruleset.base_expression_usage_frequency:
+                    leaf_type = base_expression_type
+                    node.operator = node.base_expression
+                else:
+                    node.operator = leaves.sample_rendered_leaf(node.expression_type, leaf_type, self.node_memory_size, self.edge_memory_size)
             else:
                 # TODO: again - expression_type, slot_type, filter, base_expression interaction with args to constructors here, and some probability of adjusting those; also is_reducer
                 is_reducer = None
+                child_slot_types = [random.choice(['vector', 'vector', 'float']) for _ in range(number_children)]
                 node.operator = operators.sample_operator(is_reducer=is_reducer, number_children=number_children)
-                for child in range(number_children):
-                    # TODO: here is where we can adjust those type things found in node with some small probability
-                    child_node = ExpressionTree(slot_type=node.slot_type, slot_filter=node.slot_filter, expression_complexity=child_complexity, base_expression=None, expression_type=node.expression_type, ruleset=node.ruleset, parent=node)
+                if operators.get_is_reducer(node.operator):
+                    child_slot_types = ['vector']
+
+                child_slot_filters = []
+                for child_slot_type in child_slot_types:
+                    if child_slot_type == 'float':
+                        child_slot_filters.append(None)
+                    else:
+                        if node.slot_type == 'vector':
+                            child_slot_filters.append(node.slot_filter)
+                        else:
+                            # we get to pick a slot filter!
+                            slot_filter = None
+                            if random.random() > 0.33:
+                                if random.random() < 0.5:
+                                    traversed_node = node
+                                    while traversed_node.parent is not None:
+                                        if traversed_node.slot_filter is not None:
+                                            slot_filter = traversed_node.slot_filter
+                                            break
+                                        traversed_node = traversed_node.parent
+                                if slot_filter is None:
+                                    slot_filter = random.choice(node.filters)
+                            else:
+                                # use no slot_filter
+                                pass
+                            child_slot_filters.append(slot_filter)
+                for child_slot_type, child_slot_filter in zip(child_slot_types, child_slot_filters):
+                    child_node = ExpressionTree(slot_type=child_slot_type, slot_filter=child_slot_filter, expression_complexity=child_complexity, base_expression=node.base_expression, expression_type=node.expression_type, ruleset=node.ruleset, parent=node)
                     child_node.generate()
                     node.children.append(child_node)
 
