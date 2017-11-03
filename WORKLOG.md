@@ -1,5 +1,21 @@
 # November 2, 2017
 
+The rules are actually looking really interesting! :-) After looking at one or two random ones, I was curious what the sin of a gaussian variable was since that was one of the initializations! And it seems like when rules do something dumb it's not so dumb that it'll break stuff - which is wonderful :-) mostly it just means that part of the expression is ignored or useless. Probably most of the actively harmful stuff is not easy to see by eye, and just needs to be run.
+
+Finished rule generation logic, still need to add some default conditionals and default filters; after need to write rendering logic and test. Most rendering is easy; filter select and blow up may be hard; filtering will be a little messy (just keep track, for each filter, of a bunch of indices corresponding to what that filter evaluated to near the beginning); conditionals will be a bit tricky but not that much (just > 0 is fine for now; if it doesn't work it just means our rules are less complicated); rest is EZ :-)
+
+Will try to finally set this up on 200 machines tomorrow. Looks like pickled models are only 40-60kb, so hopefully can stream any pickled model which can pass the first test over; while also having some way of tracking number of jobs completed by each individual worker. Fingers crossed!!!
+
+After that there's a few adjustments I could make:
+- edges have read + write memory; writes to read memory just get ignored (lol); write consists of node-only + edge-shared; read consists of other node's edge memory on this shared edge. whole thing gets treated the same by rules, except the edge_memory_size number is different. the synchronization of edges would be different. we would definitely want to make sure that the edge memory gets seen in normal/flipped mode by nodes on either side of the edge: this way rules behave the same on both sides.
+- edges have parity - parity just gives you a default way to align signals. input flows from low number nodes to high number nodes; output comes out at the highest number nodes. so parity would just tell you: -1 if other node on this edge is smaller, +1 if node on this edge is bigger. Make sure to make a default filter for this, maybe in both directions.
+- write the decrease_complexity method. maybe by just having it turn a random operator into a leaf. still a lot of annoying filter/type/base expression/etc weirdness. then you can write an evolutionary thing to search over rules which have worked.
+- implement backprop as a ruleset - :'( . but this would potentially allow us to fix the backprop bug with some kind of evolutionary approach on the existing ruleset
+- write some additional tests to more quickly test if a randomly generated rule is good or bad. for instance, check that the output of a 1 input 1 output network is affected by the input in a sensible way.
+
+
+# November 1, 2017
+
 Did not hit goal again, need to sleep early to wake up early.
 
 Pretty close to having something, only need to implement filter/slot_type/expression_type/base_expression/is_reducer/number_children logic/operator_input_type (operator_input_type hasn't been defined yet but probably should be; we should let the operator decide what kind of input it wants) and also all the code for training, forward pass, backward pass, etc - this should be done in a regular class which is then subclassed by Model.

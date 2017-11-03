@@ -112,6 +112,9 @@ class Ruleset:
     def sample_base_expression_usage_frequency(self):
         self.base_expression_usage_frequency = random.random() * 0.25
         return self.base_expression_usage_frequency
+    def sample_filter_break_frequency(self):
+        self.filter_break_frequency = random.random() * 0.33
+        return self.filter_break_frequency
 
     def generate(self):
         self.sample_number_filters()
@@ -124,6 +127,7 @@ class Ruleset:
         self.sample_slot_conditional_usage_frequency()
 
         self.sample_base_expression_usage_frequency()
+        self.sample_filter_break_frequency()
 
         self.filters = []
 
@@ -275,7 +279,7 @@ class ExpressionTree:
     def generate(self):
         while self.get_complexity() < self.expression_complexity or self.get_complexity() > self.expression_complexity + 4:
             # add some buffer so we don't have to get the exact complexity amount
-            # TODO: try changing that 4 to a 0 and see if it still runs in a reasonable amount of time or if there are pathological cases - WARNING - this will most likely not work when decrease_complexity raises exceptions, as is currently the case
+            # TODO: try changing that 4 to a 0 and see if it still runs in a reasonable amount of time or if there are pathological cases - WARNING - you need to implement decrease_complexity first
             if self.get_complexity() > self.expression_complexity:
                 self.decrease_complexity()
             else:
@@ -339,7 +343,17 @@ class ExpressionTree:
                         child_slot_filters.append(None)
                     else:
                         if node.slot_type == 'vector':
-                            child_slot_filters.append(node.slot_filter)
+                            child_slot_filter = node.slot_filter
+                            if node.slot_filter is None:
+                                # with some random chance give child a filter
+                                # this means the child's return value will get "blown up" into the full vector length after being returned by the child
+                                if random.random() < node.ruleset.filter_break_frequency:
+                                    child_slot_filter = random.choice(node.filters)
+                            else:
+                                # with some random chance, remove the filter from the child: so this parent op when receiving the input from the child will actually select from a larger vector and drop most of the numbers
+                                if random.random() < node.ruleset.filter_break_frequency:
+                                    child_slot_filter = None
+                            child_slot_filters.append(child_slot_filter)
                         else:
                             # we get to pick a slot filter!
                             slot_filter = None
