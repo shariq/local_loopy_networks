@@ -1,3 +1,9 @@
+# November 7, 2017
+
+I went to NOLA for a wedding and thought I'd finish this there. Unfortunately I did not spend anytime at all on actually working, only thinking. Right now all the harness code is significantly biased towards backprop-like learning - how can we make this more general?
+
+In general I'm very pessimistic that this in its current form will find anything extremely interesting. I think there needs to be better defaults around how signals are propagated, and better ways of putting error signals into the network (e.g, don't assume a forward/backward phase - there needs to be a way to do them both at the same time - maybe there's a bunch of other crazy ways of doing this like applying error all over the place directly without it being propagated by the circuit itself - idk just lots of ways in which this is fragile to our assumptions about how a big circuit should learn).
+
 # November 2, 2017
 
 The rules are actually looking really interesting! :-) After looking at one or two random ones, I was curious what the sin of a gaussian variable was since that was one of the initializations! And it seems like when rules do something dumb it's not so dumb that it'll break stuff - which is wonderful :-) mostly it just means that part of the expression is ignored or useless. Probably most of the actively harmful stuff is not easy to see by eye, and just needs to be run.

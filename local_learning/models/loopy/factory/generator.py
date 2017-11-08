@@ -4,6 +4,9 @@ import numpy as np
 
 import local_learning.models.loopy.factory.leaves as leaves
 import local_learning.models.loopy.factory.operators as operators
+import local_learning.models.loopy.factory.renderer as renderer
+
+import local_learning.graph.loopy
 
 # the way we make an expression of some complexity is to take a blank expression and randomly distort it, and keep doing that until we get our desired length
 # increase_complexity should sample from the right distribution; so adding one node which may increase complexity by too much at once; but it's all approximate anyways so it's fine if it's a bit off
@@ -37,32 +40,141 @@ class Harness:
         self.model.generate()
 
     def render(self):
-        ruleset_code = self.ruleset.render()
-        model_code = self.model.render()
-        return ruleset_code + '\n\n\n' + model_code
+        return renderer.Renderer(self).render()
 
 
 class Model:
-    # picks forward, backward, init, train, and async_train methods
+    # picks init, train, forward, backward, and async_train methods
+    # because there is a backward and forward pass like this, we are essentially just finding a better backprop right now... the shittiest part is needing to know how long to step for by waiting for all errors to go away - why?! we really should just step for some reasonable amount of time and not worry too much. same with forward pass.
     def __init__(self):
         pass
 
     def generate(self):
-        # generating python code is a bit annoying because of indentation... don't assume indentation when generating each line; always add that later
-        # of course this is really bad if we have any multiline strings...
-        self.init_method = 'def __init__(self, input_size=2, output_size=1):pass'
-        self.forward_method = 'def forward(self, *args, **kwargs):pass'
-        self.backward_method = 'def backward(self, *args, **kwargs):pass'
-        self.train_method = 'def train(self):pass'
-        self.async_train_method = 'def async_train(self):pass'
 
-        self.header = 'class Model:'
+        self.adjacency_dict = random.choice(local_learning.graph.loopy.adjacency_dicts)
 
-        self.methods = [self.init_method, self.forward_method, self.backward_method, self.train_method, self.async_train_method]
+        init_methods = [
+'''
+def __init__(self, input_size=2, output_size=1):
+    # modify adjacency_dict to add single edge output nodes, so it's easier to apply error
+    adjacency_dict = {adjacency_dict}
+    undirected_adjacency_dict = local_learning.graph.tools.undirect_adjacency_dict(adjacency_dict)
+    regular_output_nodes = list(range(len(undirect_adjacency_dict) - output_size, len(undirect_adjacency_dict)))
+    for regular_output_node in regular_output_nodes:
+        new_output_node = regular_output_node + output_size
+        for node_a, node_b in [(regular_output_node, new_output_node), (new_output_node, regular_output_node)]:
+            # keep the graph undirected
+            if not undirected_adjacency_dict.get(node_a, False):
+                undirected_adjacency_dict[node_a] = set()
+            undirected_adjacency_dict[node_a].add(node_b)
 
+    self.network = local_learning.network.Network(in_adjacency_dict=undirected_adjacency_dict, node_memory_size={node_memory_size}, edge_memory_size={edge_memory_size}, step_rule=step_rule)
+    self.network.initialize(initialize_rule=initialize_rule)
+    self.input_size = input_size
+    self.output_size = output_size
+    self.output_nodes = list(range(len(self.network.nodes) - self.output_size, len(self.network.nodes)))
+''']
 
-    def render(self):
-        return self.header + '\n    ' + '\n    '.join(self.methods)
+        train_methods = [
+'''
+def train(self, dataset, iterations=100):
+    for iteration in range(iterations):
+        input_data, output_data = random.choice(dataset)
+        self.async_train(input_data, output_data)
+'''
+]
+
+        forward_methods = [
+'''
+def forward(self, input_data, max_steps=300):
+    # set input data
+    for node, signal in enumerate(input_data):
+        self.network.read_buffer[node][{NODE_SIGNAL_MEMORY_INDEX}] = signal
+        self.network.read_buffer[node][{NODE_SIGNAL_JUST_SENT_INDEX}] = 1
+        for neighbor in self.network.adjacency_dict[node]:
+            edge_memory = self.network.get_edge_memory((node, neighbor))[:]
+            edge_memory[{EDGE_SIGNAL_INDEX}] = signal
+            edge_memory[{EDGE_HAS_SIGNAL_INDEX}] = 1
+            self.network.set_edge_memory(edge=(node, neighbor), edge_memory=edge_memory)
+
+    # propagate input data forward
+    # note that right now multiple input signals coming in out of sync would make the network send output data along input edges
+    # so don't try doing anything fancy to handle out of sync signals, since there's no way around this unfortunate fact
+
+    # wait for all secondary_output_nodes to have NODE_SIGNAL_JUST_SENT_INDEX
+
+    steps = 0
+    while True:
+        self.network.step()
+        ready = all(self.network.get_node_memory(output_node)[{NODE_SIGNAL_JUST_SENT_INDEX}] == 1 for output_node in self.output_nodes)
+        if ready:
+            break
+        steps += 1
+        if steps > max_steps:
+            logger.error('ERROR: ran > {{}} steps in a forward pass without getting an output; probably a bug!'.format(max_steps))
+            raise Exception('ran > {{}} steps in forward pass without getting an output'.format(max_steps))
+
+    output = []
+
+    for output_node in self.secondary_output_nodes:
+        output.append(self.network.read_buffer[output_node][{NODE_SIGNAL_MEMORY_INDEX}])
+
+    return output
+'''
+]
+
+        backward_methods = [
+'''
+def backward(self, output_data, max_steps=300):
+    # apply error to the secondary output edges
+    # then run step until there's no error left
+    for expected_signal, output_node in zip(output_data, self.output_nodes):
+        actual_signal = self.network.read_buffer[output_node][{NODE_SIGNAL_MEMORY_INDEX}]
+
+        error = expected_signal - actual_signal
+
+        for neighbor in self.network.adjacency_dict[output_node]:
+            edge_memory = self.network.get_edge_memory((output_node, neighbor))
+            edge_memory[{EDGE_HAS_ERROR_INDEX}] = 1
+            edge_memory[{EDGE_ERROR_INDEX}] = error
+            self.network.set_edge_memory((output_node, neighbor), edge_memory)
+
+        self.network.read_buffer[output_node][{NODE_ERROR_JUST_SENT_INDEX}] = 1
+
+    steps = 0
+    while True:
+        self.network.step()
+        ready = all(node_buffer[{NODE_ERROR_JUST_SENT_INDEX}] == 0 for node_buffer in self.network.read_buffer)
+        if ready:
+            break
+        steps += 1
+        if steps > max_steps:
+            logger.error('ERROR: ran > {} steps in a backward pass without getting an output; probably a bug!'.format(max_steps))
+            raise Exception('ran > {} steps in backward pass without getting an output'.format(max_steps))
+''']
+
+        async_train_methods = [
+'''
+def async_train(self, input_data, output_data):
+    self.forward(input_data)
+    self.backward(output_data)
+'''
+# in the future have something which does a forward and backward at the same time
+# weird thing about this is if we're thinking of error we don't actually know until doing the forward pass which direction the error is in...
+]
+
+        self.header = '''
+import local_learning
+import local_learning.network
+
+import logging
+logger = logging.getLogger()
+
+class Model:
+'''
+
+        self.methods = [random.choice(method_group).strip() for method_group in [init_methods, forward_methods, backward_methods, train_methods, async_train_methods]]
+
 
 
 class Ruleset:
@@ -168,34 +280,6 @@ class Ruleset:
                 self.step_rules[-1].append(rule)
 
         return self
-
-    def render(self):
-        initialize_rules = self.initialize_rules
-        step_rules = sum(self.step_rules, [])
-        # turn these into code
-
-        initialize_rule_lines = ['node_buffer = np.zeros(node_memory_size + edge_memory_size * edges)'] + [self.render_rule(initialize_rule_line) for initialize_rule_line in initialize_rules]
-        initialize_rule = 'def initialize_rule(node_memory_size, edge_memory_size, edges):\n    {}'.format('\n    '.join(initialize_rule_lines))
-
-        step_rule_lines = ['node_write_buffer[:] = node_read_buffer'] + [self.render_rule(step_rule_line) for step_rule_line in step_rules]
-        step_rule = 'def step_rule(node_read_buffer, node_write_buffer, node_memory_size, edge_memory_size, edges):\n    {}'.format('\n    '.join(step_rule_lines))
-
-        code = initialize_rule + '\n\n\n' + step_rule
-
-        return code
-
-    def render_rule(self, rule):
-        assert rule.slot_type in ['vector', 'float']
-        if rule.slot_type == 'vector' and rule.slot_filter is not None:
-                return '(VECTOR) {slot_value}[filter={slot_filter}] = {rendered_expression}'.format(slot_value=rule.slot_value, slot_filter=self.render_expression_tree(rule.slot_filter), rendered_expression=self.render_expression_tree(rule.expression_tree))
-        return '({slot_type}) {slot_value} = {rendered_expression}'.format(slot_type=rule.slot_type.upper(), slot_value=rule.slot_value, rendered_expression=self.render_expression_tree(rule.expression_tree))
-
-    def render_expression_tree(self, expression_tree):
-        # do it here because there's a lot of state which we really don't want the rules to also be keeping track of, which tells us, e.g, how many memory slots there are, etc
-        if len(expression_tree.children) == 0:
-            return expression_tree.operator
-        else:
-            return '{operator}({args})'.format(operator=operators.render(expression_tree.operator), args=', '.join(self.render_expression_tree(child) for child in expression_tree.children))
 
 
 class Rule:

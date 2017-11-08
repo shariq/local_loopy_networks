@@ -75,12 +75,14 @@ def directed_waxman_graph(n, alpha=0.4, beta=0.1, domain_scale=1.0, dimensionali
     return G
 
 def make_waxman_adjacency_dict(size=200):
+    # try to get a average_clustering_coefficient of ~0.25 and 10-20 edges/node, or 5-10 edges/node if graph is small
     if size > 1000:
         logger.warn('WARNING: this waxman_graph is really big and may take way too long with our implementation')
     if size >= 300:
-        alpha, beta = 0.2, 0.5
+        alpha, beta = 2.5, 0.1
     elif size >= 50:
-        alpha, beta = 0.8, 0.6
+        alpha, beta = 0.5, 0.5
     else:
+        # this is really tiny
         alpha, beta = 1.0, 1.0
     return directed_waxman_graph(size, alpha=alpha, beta=beta)
