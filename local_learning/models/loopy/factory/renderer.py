@@ -1,5 +1,11 @@
+import local_learning.models.loopy.factory.leaves as leaves
+import local_learning.models.loopy.factory.operators as operators
+
+
+
 def indent_code_block(code_block):
     return '    \n'.join(code_block.splitlines())
+
 
 class Renderer:
     def __init__(self, harness):
@@ -16,7 +22,9 @@ class Renderer:
         return ruleset_code + '\n\n\n' + model_code
 
 
-    def render_ruleset(ruleset):
+    def render_ruleset(self):
+        ruleset = self.ruleset
+
         initialize_rules = ruleset.initialize_rules
         step_rules = sum(ruleset.step_rules, [])
         # turn these into code

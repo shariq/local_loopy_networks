@@ -149,8 +149,8 @@ def backward(self, output_data, max_steps=300):
             break
         steps += 1
         if steps > max_steps:
-            logger.error('ERROR: ran > {} steps in a backward pass without getting an output; probably a bug!'.format(max_steps))
-            raise Exception('ran > {} steps in backward pass without getting an output'.format(max_steps))
+            logger.error('ERROR: ran > {{}} steps in a backward pass without getting an output; probably a bug!'.format(max_steps))
+            raise Exception('ran > {{}} steps in backward pass without getting an output'.format(max_steps))
 ''']
 
         async_train_methods = [

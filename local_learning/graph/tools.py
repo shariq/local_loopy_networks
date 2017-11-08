@@ -3,6 +3,7 @@ from collections import defaultdict
 import logging
 logger = logging.getLogger()
 
+
 def undirect_adjacency_dict(adjacency_dict):
     undirected_adjacency_dict = defaultdict(lambda: set())
     for key, value in adjacency_dict.items():
