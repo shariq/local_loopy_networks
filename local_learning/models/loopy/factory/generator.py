@@ -59,7 +59,7 @@ def __init__(self, input_size=2, output_size=1):
     # modify adjacency_dict to add single edge output nodes, so it's easier to apply error
     adjacency_dict = {adjacency_dict}
     undirected_adjacency_dict = local_learning.graph.tools.undirect_adjacency_dict(adjacency_dict)
-    regular_output_nodes = list(range(len(undirect_adjacency_dict) - output_size, len(undirect_adjacency_dict)))
+    regular_output_nodes = list(range(len(undirected_adjacency_dict) - output_size, len(undirected_adjacency_dict)))
     for regular_output_node in regular_output_nodes:
         new_output_node = regular_output_node + output_size
         for node_a, node_b in [(regular_output_node, new_output_node), (new_output_node, regular_output_node)]:
@@ -145,12 +145,9 @@ def backward(self, output_data, max_steps=300):
     while True:
         self.network.step()
         ready = all(node_buffer[{NODE_ERROR_JUST_SENT_INDEX}] == 0 for node_buffer in self.network.read_buffer)
-        if ready:
-            break
         steps += 1
-        if steps > max_steps:
-            logger.error('ERROR: ran > {{}} steps in a backward pass without getting an output; probably a bug!'.format(max_steps))
-            raise Exception('ran > {{}} steps in backward pass without getting an output'.format(max_steps))
+        if ready or steps > max_steps:
+            break
 ''']
 
         async_train_methods = [
@@ -164,8 +161,14 @@ def async_train(self, input_data, output_data):
 ]
 
         self.header = '''
+import numpy as np
+
 import local_learning
 import local_learning.network
+import local_learning.graph.tools
+import local_learning.models.loopy.factory.operators as operators
+import local_learning.models.loopy.factory.leaves as leaves
+import local_learning.models.loopy
 
 import logging
 logger = logging.getLogger()
@@ -259,7 +262,7 @@ class Ruleset:
 
         self.filters = temp_filters
 
-        slot_values = ['slot_node_{}'.format(i) for i in range(self.node_memory_size)] + ['slot_edge_{}'.format(i) for i in range(self.edge_memory_size)]
+        self.slot_values = slot_values = ['node_write_buffer[{}]'.format(i) for i in range(self.node_memory_size)] + ['slot_edge_{}'.format(i) for i in range(self.edge_memory_size)]
         slot_types = ['float'] * self.node_memory_size + ['vector'] * (self.edge_memory_size)
         slot_base_expressions = [leaves.context_renderer(leaves.node_memory, 'step', node_index=i) for i in range(self.node_memory_size)] + [leaves.context_renderer(leaves.edge_memory, 'step', edge_index=i) for i in range(self.edge_memory_size)]
 
@@ -409,6 +412,8 @@ class ExpressionTree:
 
             # assertions make sure this node hasn't been somehow already initialized
             if number_children == 0:
+                node.slot_filter = None
+                # leaves never have a slot_filter, that way we are always selecting from the full filtered vector whenever accessing some memory
                 leaf_type = node.slot_type
                 if leaf_type is None:
                     leaf_type = random.choice(['vector', 'vector', 'float'])

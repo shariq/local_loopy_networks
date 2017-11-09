@@ -21,7 +21,7 @@ def np_float_wrapper(func):
     @wraps(func)
     def wrapper(*args, **kwargs):
         result = func(*args, **kwargs)
-        if isinstance(result, np.array) and result.dtype != float_32_dtype:
+        if isinstance(result, np.ndarray) and result.dtype != float_32_dtype:
             return result.astype('float32')
         return result
     return wrapper
@@ -180,4 +180,15 @@ def sample_operator(is_reducer=None, number_children=None):
     return restricted_operator_sampler
 
 def render(operator):
+    if isinstance(operator, str):
+        return operator
     return 'operators.' + operator.__name__
+
+
+####
+# filter helper
+####
+
+def undo_filter(vector, filter_vector):
+    # also called "blowing up" a filtered vector
+    return NotImplemented
