@@ -23,17 +23,7 @@ class Renderer:
 
 
     def render_ruleset(self):
-
-        initialize_header = 'def initialize_rule(node_memory_size, edge_memory_size, edges):'
-
-        initialize_rule_lines = [
-            'node_write_buffer = np.zeros(node_memory_size + edge_memory_size * edges)',
-            *[self.render_rule(initialize_rule_line) for initialize_rule_line in self.ruleset.initialize_rules],
-            'return node_write_buffer'
-        ]
-
-        initialize_rule_code = initialize_header + '\n' + indent_code_block('\n'.join(initialize_rule_lines))
-
+        initialize_rule_code = self.render_initialize_rule_code()
         step_rule_code = self.render_step_rule_code()
 
         code = initialize_rule_code + '\n\n\n' + step_rule_code
@@ -41,8 +31,30 @@ class Renderer:
         return code
 
 
+    def render_initialize_rule_code(self):
+        initialize_header = 'def initialize_rule(node_memory_size, edge_memory_size, edges):'
+
+        edge_slot_assignments = '\n'.join([
+            'slot_edge_{i}=node_write_buffer[{node_memory_size}+{i}::{edge_memory_size}]'.format(
+                i=i,
+                edge_memory_size=self.edge_memory_size,
+                node_memory_size=self.node_memory_size
+            ) for i in range(self.edge_memory_size)])
+
+        initialize_rule_lines = [
+            'node_write_buffer = np.zeros(node_memory_size + edge_memory_size * edges)',
+            *edge_slot_assignments.splitlines(),
+            *[self.render_rule(initialize_rule_line) for initialize_rule_line in self.ruleset.initialize_rules],
+            'return node_write_buffer'
+        ]
+
+        initialize_rule_code = initialize_header + '\n' + indent_code_block('\n'.join(initialize_rule_lines))
+
+        return initialize_rule_code
+
+
     def render_step_rule_code(self):
-        method_header = 'def step_rule(node_read_buffer, node_write_buffer, node_memory_size, edge_memory_size):'
+        method_header = 'def step_rule(node_read_buffer, node_write_buffer, node_memory_size, edge_memory_size, edges):'
 
         edge_slot_assignments = '\n'.join([
             'slot_edge_{i}=node_write_buffer[{node_memory_size}+{i}::{edge_memory_size}]'.format(

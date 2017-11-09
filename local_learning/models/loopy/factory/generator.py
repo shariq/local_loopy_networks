@@ -429,40 +429,43 @@ class ExpressionTree:
                 if operators.get_is_reducer(node.operator):
                     child_slot_types = ['vector']
 
-                child_slot_filters = []
-                for child_slot_type in child_slot_types:
-                    if child_slot_type == 'float':
-                        child_slot_filters.append(None)
-                    else:
-                        if node.slot_type == 'vector':
-                            child_slot_filter = node.slot_filter
-                            if node.slot_filter is None:
-                                # with some random chance give child a filter
-                                # this means the child's return value will get "blown up" into the full vector length after being returned by the child
-                                if random.random() < node.ruleset.filter_break_frequency and node.filters:
-                                    child_slot_filter = random.choice(node.filters)
-                            else:
-                                # with some random chance, remove the filter from the child: so this parent op when receiving the input from the child will actually select from a larger vector and drop most of the numbers
-                                if random.random() < node.ruleset.filter_break_frequency:
-                                    child_slot_filter = None
-                            child_slot_filters.append(child_slot_filter)
+                if node.expression_type in ['filter', 'conditional', 'initialize']:
+                    child_slot_filters = [None] * len(child_slot_types)
+                else:
+                    child_slot_filters = []
+                    for child_slot_type in child_slot_types:
+                        if child_slot_type == 'float':
+                            child_slot_filters.append(None)
                         else:
-                            # we get to pick a slot filter!
-                            slot_filter = None
-                            if random.random() > 0.33:
-                                if random.random() < 0.5:
-                                    traversed_node = node
-                                    while traversed_node.parent is not None:
-                                        if traversed_node.slot_filter is not None:
-                                            slot_filter = traversed_node.slot_filter
-                                            break
-                                        traversed_node = traversed_node.parent
-                                if slot_filter is None and node.filters:
-                                    slot_filter = random.choice(node.filters)
+                            if node.slot_type == 'vector':
+                                child_slot_filter = node.slot_filter
+                                if node.slot_filter is None:
+                                    # with some random chance give child a filter
+                                    # this means the child's return value will get "blown up" into the full vector length after being returned by the child
+                                    if random.random() < node.ruleset.filter_break_frequency and node.filters:
+                                        child_slot_filter = random.choice(node.filters)
+                                else:
+                                    # with some random chance, remove the filter from the child: so this parent op when receiving the input from the child will actually select from a larger vector and drop most of the numbers
+                                    if random.random() < node.ruleset.filter_break_frequency:
+                                        child_slot_filter = None
+                                child_slot_filters.append(child_slot_filter)
                             else:
-                                # use no slot_filter
-                                pass
-                            child_slot_filters.append(slot_filter)
+                                # we get to pick a slot filter!
+                                slot_filter = None
+                                if random.random() > 0.33:
+                                    if random.random() < 0.5:
+                                        traversed_node = node
+                                        while traversed_node.parent is not None:
+                                            if traversed_node.slot_filter is not None:
+                                                slot_filter = traversed_node.slot_filter
+                                                break
+                                            traversed_node = traversed_node.parent
+                                    if slot_filter is None and node.filters:
+                                        slot_filter = random.choice(node.filters)
+                                else:
+                                    # use no slot_filter
+                                    pass
+                                child_slot_filters.append(slot_filter)
                 for child_slot_type, child_slot_filter in zip(child_slot_types, child_slot_filters):
                     child_node = ExpressionTree(slot_type=child_slot_type, slot_filter=child_slot_filter, expression_complexity=child_complexity, base_expression=node.base_expression, expression_type=node.expression_type, ruleset=node.ruleset, parent=node)
                     child_node.generate()
@@ -509,5 +512,5 @@ class ExpressionTree:
                 node_to_adjust.increase_complexity()
 
     def decrease_complexity(self):
-        # for now not necessary
+        # for now not implemented
         raise Exception(NotImplemented)

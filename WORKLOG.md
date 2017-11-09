@@ -1,3 +1,11 @@
+# November 8, 2017
+
+I'm starting to be more OK with just working a lot at a consistent pace without being super productive. Maybe the path to being super productive is accept where I'm at now, and push incrementally to be more focused.
+
+Today I got the code generation running and compiling. Now there's a few bugs which need to be fixed but we are basically done with generating and testing update rules. Hopefully we finally run the experiment tomorrow.
+
+There is a lot of room for improvement; this is only the beginning of the project.
+
 # November 7, 2017
 
 I went to NOLA for a wedding and thought I'd finish this there. Unfortunately I did not spend anytime at all on actually working, only thinking. Right now all the harness code is significantly biased towards backprop-like learning - how can we make this more general?

@@ -11,6 +11,8 @@ from local_learning.models.loopy.search import search_harness
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Run checks on loopy.factory sampled models.')
     parser.add_argument('--verbose', '-v', action='count', default=0)
+    parser.add_argument('--quiet', '-q', action='store_true', default=False)
+    parser.add_argument('--slow', '-s', action='store_true', default=False)
     args = parser.parse_args()
 
     if args.verbose == 0:
@@ -20,6 +22,11 @@ if __name__ == '__main__':
     elif args.verbose > 1:
         logger.setLevel(logging.DEBUG)
 
+    if args.quiet:
+        logger.setLevel(logging.CRITICAL)
+
     for _, code, results in search_harness():
         total_score = sum(results) / len(results)
         logger.info('{} got score {} with results {}'.format(code[:200].replace('\n', '\\n'), total_score, results))
+        if args.slow:
+            input()
