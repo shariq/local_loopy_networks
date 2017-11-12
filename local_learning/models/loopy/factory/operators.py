@@ -23,6 +23,8 @@ def np_float_wrapper(func):
         result = func(*args, **kwargs)
         if isinstance(result, np.ndarray) and result.dtype != float_32_dtype:
             return result.astype('float32')
+        if isinstance(result, bool):
+            return float(result)
         return result
     return wrapper
 
@@ -122,7 +124,9 @@ def mean(o):
 mean.is_reducer = True
 
 def mean_two(a, b):
-    return float(np.sum(a) + np.sum(b))/(len(a)+len(b))
+    len_a = getattr(a, '__len__', lambda: 1)()
+    len_b = getattr(b, '__len__', lambda: 1)()
+    return float(np.sum(a) + np.sum(b))/(len_a+len_b)
 mean_two.is_reducer = True
 
 def std(o):
@@ -191,4 +195,16 @@ def render(operator):
 
 def undo_filter(vector, filter_vector):
     # also called "blowing up" a filtered vector
-    return NotImplemented
+    new_vector = np.zeros(len(filter_vector))
+    new_vector[filter_vector] = vector
+    return new_vector
+
+
+def apply_filter(vector, filter_vector):
+    # vector might be a float ; this is why we use this separate operator
+    if isinstance(vector, np.ndarray):
+        return vector[filter_vector]
+    else:
+        return_vector = np.zeros(len(filter_vector))
+        return_vector[:] = float(vector)
+        return return_vector[filter_vector]

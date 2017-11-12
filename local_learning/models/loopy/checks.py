@@ -8,12 +8,8 @@ logger = logging.getLogger()
 def check_signal_propagation(harness_class):
     # check that we can get a forward and backward pass within a reasonable amount of time on a randomly intialized model
     harness = harness_class(input_size=2, output_size=1)
-    try:
-        harness.forward([5], max_steps=100)
-        harness.backward([5], max_steps=100)
-    except Exception as e:
-        logger.error(e, exc_info=True)
-        return 0.0
+    harness.forward([5], max_steps=100)
+    harness.backward([5], max_steps=100)
     return 1.0
 check_signal_propagation.accuracy_requirement = 0.9
 
@@ -33,11 +29,7 @@ def check_basic_function(harness_class, train_dataset):
     number_correct_examples = 0
 
     for input_data, ground_truth in train_dataset:
-        try:
-            harness_output = harness.forward(input_data)
-        except Exception as e:
-            logger.error(e, exc_info=True)
-            continue
+        harness_output = harness.forward(input_data)
         int_ground_truth = [int(round(f)) for f in ground_truth]
         int_harness_output = [int(round(f)) for f in harness_output]
 

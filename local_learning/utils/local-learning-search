@@ -13,6 +13,8 @@ if __name__ == '__main__':
     parser.add_argument('--verbose', '-v', action='count', default=0)
     parser.add_argument('--quiet', '-q', action='store_true', default=False)
     parser.add_argument('--slow', '-s', action='store_true', default=False)
+    parser.add_argument('--allow-exceptions', '-x', action='store_true', default=False)
+
     args = parser.parse_args()
 
     if args.verbose == 0:
@@ -25,7 +27,7 @@ if __name__ == '__main__':
     if args.quiet:
         logger.setLevel(logging.CRITICAL)
 
-    for _, code, results in search_harness():
+    for _, code, results in search_harness(catch_exceptions=not args.allow_exceptions):
         total_score = sum(results) / len(results)
         logger.info('{} got score {} with results {}'.format(code[:200].replace('\n', '\\n'), total_score, results))
         if args.slow:

@@ -10,10 +10,17 @@ import local_learning.models.loopy.factory.generator as generator
 from local_learning.models.backprop import BackpropModel
 
 
+def debug_log_code(code):
+    lines = code.splitlines()
+    fill_size = 1 + len(str(len(lines)))
+    new_lines = ['{l}|{c}'.format(l=str(i+1).ljust(fill_size), c=line) for i, line in enumerate(lines)]
+    return '\n'.join(new_lines)
+
+
 def compile_model(harness_code, class_name='Model', module_name='harness_module'):
-    logger.debug(harness_code)
+    logger.debug(debug_log_code(harness_code))
     # above line should really be eliminated once we have ironed out kinks...
-    compiled = compile(harness_code, '', 'exec')
+    compiled = compile(harness_code, '<generated>', 'exec')
     module = ModuleType(module_name)
     exec(compiled, module.__dict__)
     return module.__dict__[class_name]
@@ -50,7 +57,10 @@ def search_harness(model_class_sampler=sample_factory_model_class, limit=None, c
                         break
                 except Exception as e:
                     logger.error(e, exc_info=True)
-                    break
+                    if not catch_exceptions:
+                        raise
+                    else:
+                        break
             iterations += 1
             yield generator_harness, harness_code, results
         except Exception as e:

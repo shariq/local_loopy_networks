@@ -162,6 +162,7 @@ def async_train(self, input_data, output_data):
 
         self.header = '''
 import numpy as np
+import random
 
 import local_learning
 import local_learning.network
@@ -424,10 +425,12 @@ class ExpressionTree:
                     node.operator = leaves.sample_rendered_leaf(node.expression_type, leaf_type, self.node_memory_size, self.edge_memory_size)
             else:
                 is_reducer = None
+                if node.slot_type == 'float':
+                    is_reducer = True
                 child_slot_types = [random.choice(['vector', 'vector', 'float']) for _ in range(number_children)]
                 node.operator = operators.sample_operator(is_reducer=is_reducer, number_children=number_children)
                 if operators.get_is_reducer(node.operator):
-                    child_slot_types = ['vector']
+                    child_slot_types = ['vector'] * number_children
 
                 if node.expression_type in ['filter', 'conditional', 'initialize']:
                     child_slot_filters = [None] * len(child_slot_types)
