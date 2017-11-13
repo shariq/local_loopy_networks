@@ -196,6 +196,8 @@ class BackpropModel:
         # wait for all secondary_output_nodes to have NODE_SIGNAL_JUST_SENT_INDEX
 
         steps = 0
+        info = {}
+
         while True:
             #self.network.debug_log_buffers('step={}'.format(steps))
             self.network.step()
@@ -208,11 +210,12 @@ class BackpropModel:
                 raise Exception('ran > {} steps in forward pass without getting an output'.format(max_steps))
 
         output = []
+        info['steps'] = steps
 
         for output_node in self.secondary_output_nodes:
             output.append(self.network.read_buffer[output_node][NODE_SIGNAL_MEMORY_INDEX])
 
-        return output
+        return output, info
 
 
     def backward(self, output_data, max_steps=1000):
@@ -238,6 +241,8 @@ class BackpropModel:
 
 
         steps = 0
+        info = {}
+
         while True:
             self.network.step()
             ready = all(node_buffer[NODE_ERROR_JUST_SENT_INDEX] == 0 for node_buffer in self.network.read_buffer)
@@ -248,6 +253,9 @@ class BackpropModel:
                 logger.error('ERROR: ran > {} steps in a backward pass without getting an output; probably a bug!'.format(max_steps))
                 raise Exception('ran > {} steps in backward pass without getting an output'.format(max_steps))
 
+        info['steps'] = steps
+
+        return None, info
 
 
     def set_weights(self, weights):

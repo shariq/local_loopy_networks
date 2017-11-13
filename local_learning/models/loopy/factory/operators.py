@@ -15,17 +15,14 @@ operator_sampler = []
 # helper functions
 #############
 
-float_32_dtype = np.dtype('float32')
 def np_float_wrapper(func):
     # only use this when you know that the function changes the vector type of an input
     @wraps(func)
     def wrapper(*args, **kwargs):
         result = func(*args, **kwargs)
-        if isinstance(result, np.ndarray) and result.dtype != float_32_dtype:
+        if isinstance(result, np.ndarray):
             return result.astype('float32')
-        if isinstance(result, bool):
-            return float(result)
-        return result
+        return float(result)
     return wrapper
 
 ##############
@@ -104,32 +101,65 @@ def sum_two(a, b):
 sum_two.is_reducer = True
 
 def max_(o):
+    if getattr(o, '__len__', lambda: 1)() == 0:
+        # HACK for dealing with 0 length vectors
+        return 0.0
     return np.amax(o)
 max_.is_reducer = True
 
 def max_two(a, b):
+    len_a = getattr(a, '__len__', lambda: 1)()
+    len_b = getattr(b, '__len__', lambda: 1)()
+    if len_a + len_b == 0:
+        # HACK
+        return 0.0
+    if len_a == 0:
+        return np.amax(b)
+    if len_b == 0:
+        return np.amax(a)
     return max([np.amax(a), np.amax(b)])
 max_two.is_reducer = True
 
 def min_(o):
+    if getattr(o, '__len__', lambda: 1)() == 0:
+        # HACK for dealing with 0 length vectors
+        return 0.0
     return np.amin(o)
 min_.is_reducer = True
 
 def min_two(a, b):
+    len_a = getattr(a, '__len__', lambda: 1)()
+    len_b = getattr(b, '__len__', lambda: 1)()
+    if len_a + len_b == 0:
+        # HACK
+        return 0.0
+    if len_a == 0:
+        return np.amax(b)
+    if len_b == 0:
+        return np.amax(a)
     return min([np.amin(a), np.amin(b)])
 min_two.is_reducer = True
 
 def mean(o):
+    if getattr(o, '__len__', lambda: 1)() == 0:
+        # HACK for dealing with 0 length vectors
+        return 0.0
     return np.mean(o)
 mean.is_reducer = True
 
 def mean_two(a, b):
     len_a = getattr(a, '__len__', lambda: 1)()
     len_b = getattr(b, '__len__', lambda: 1)()
+    if len_a + len_b == 0:
+        # HACK
+        return 0.0
     return float(np.sum(a) + np.sum(b))/(len_a+len_b)
 mean_two.is_reducer = True
 
 def std(o):
+    if getattr(o, '__len__', lambda: 1)() == 0:
+        # HACK for dealing with 0 length vectors
+        return 0.0
     return np.std(o)
 std.is_reducer = True
 
@@ -208,3 +238,22 @@ def apply_filter(vector, filter_vector):
         return_vector = np.zeros(len(filter_vector))
         return_vector[:] = float(vector)
         return return_vector[filter_vector]
+
+
+def ensure_vector(obj, size, slot_filter):
+    if isinstance(obj, np.ndarray):
+        if len(obj) == size and slot_filter is None:
+            return obj
+        if slot_filter is not None and len(obj) == sum(slot_filter):
+            return obj
+        raise Exception("incorrect length vector in ensure_vector")
+    if obj is None:
+        raise Exception("unsupported None type in ensure_vector")
+    if slot_filter is None:
+        new_vector = np.zeros(size)
+        new_vector[:] = float(obj)
+        return new_vector
+    else:
+        new_vector = np.zeros(sum(slot_filter))
+        new_vector[:] = float(obj)
+        return new_vector

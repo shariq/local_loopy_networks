@@ -55,7 +55,9 @@ class TestBackprop(unittest.TestCase):
         for input_data, output_data in train_dataset:
             model.clean()
             ground_truth.append(output_data[0])
-            model_output.append(int(round(model.forward(input_data)[0])))
+            model_forwarded, _ = model.forward(input_data)
+            model_forwarded_index_0 = int(round(model_forwarded[0]))
+            model_output.append(model_forwarded_index_0)
 
         self.assertSequenceEqual(ground_truth, model_output)
 
@@ -80,34 +82,9 @@ class TestBackprop(unittest.TestCase):
         for input_data, output_data in train_dataset:
             model.clean()
             ground_truth.append(output_data[0])
-            model_output.append(int(round(model.forward(input_data)[0])))
-
-        self.assertSequenceEqual(ground_truth, model_output)
-
-
-    def test_train_switch(self):
-        train_dataset = [
-            ([0, 0] , [0, 0]),
-            ([0, 1] , [1, 0]),
-            ([1, 0] , [0, 1]),
-            ([1, 1] , [1, 1]),
-        ]
-        iterations = 1000
-        backprop.LEARNING_RATE = 0.03
-        model = BackpropModel(input_size=2, hidden_size=8, output_size=2)
-        # weights = model.get_weights()
-        # print('; '.join(['{}: {}'.format(edge, weights[edge]) for edge in [(0,2), (1,2), (2,3), (3,4)]]))
-        model.train(dataset=train_dataset, iterations=iterations)
-
-        ground_truth = []
-        model_output = []
-
-        for input_data, output_data in train_dataset:
-            model.clean()
-            ground_truth.append(output_data[0] * 10 + output_data[1])
-            sample = model.forward(input_data)
-            print(sample)
-            model_output.append(int(round(sample[0]))*10 + int(round(sample[1])))
+            model_forwarded, _ = model.forward(input_data)
+            model_forwarded_index_0 = int(round(model_forwarded[0]))
+            model_output.append(model_forwarded_index_0)
 
         self.assertSequenceEqual(ground_truth, model_output)
 

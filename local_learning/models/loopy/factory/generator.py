@@ -51,7 +51,7 @@ class Model:
 
     def generate(self):
 
-        self.adjacency_dict = random.choice(local_learning.graph.loopy.adjacency_dicts)
+        self.adjacency_dict = local_learning.graph.loopy.adjacency_dicts[0]  # random.choice(local_learning.graph.loopy.adjacency_dicts)
 
         init_methods = [
 '''
@@ -101,25 +101,26 @@ def forward(self, input_data, max_steps=300):
     # note that right now multiple input signals coming in out of sync would make the network send output data along input edges
     # so don't try doing anything fancy to handle out of sync signals, since there's no way around this unfortunate fact
 
-    # wait for all secondary_output_nodes to have NODE_SIGNAL_JUST_SENT_INDEX
+    # wait for all output_nodes to have NODE_SIGNAL_JUST_SENT_INDEX
 
     steps = 0
     while True:
         self.network.step()
-        ready = all(self.network.get_node_memory(output_node)[{NODE_SIGNAL_JUST_SENT_INDEX}] == 1 for output_node in self.output_nodes)
+        ready = all(self.network.get_node_memory(output_node)[{NODE_SIGNAL_JUST_SENT_INDEX}] > 0.5 for output_node in self.output_nodes)
         if ready:
             break
         steps += 1
         if steps > max_steps:
-            logger.error('ERROR: ran > {{}} steps in a forward pass without getting an output; probably a bug!'.format(max_steps))
-            raise Exception('ran > {{}} steps in forward pass without getting an output'.format(max_steps))
+            break
 
     output = []
+    info = {{}}
+    info['steps'] = steps
 
-    for output_node in self.secondary_output_nodes:
+    for output_node in self.output_nodes:
         output.append(self.network.read_buffer[output_node][{NODE_SIGNAL_MEMORY_INDEX}])
 
-    return output
+    return output, info
 '''
 ]
 
@@ -142,12 +143,17 @@ def backward(self, output_data, max_steps=300):
         self.network.read_buffer[output_node][{NODE_ERROR_JUST_SENT_INDEX}] = 1
 
     steps = 0
+    info = {{}}
+
     while True:
         self.network.step()
-        ready = all(node_buffer[{NODE_ERROR_JUST_SENT_INDEX}] == 0 for node_buffer in self.network.read_buffer)
+        ready = all(node_buffer[{NODE_ERROR_JUST_SENT_INDEX}] <= 0.5 for node_buffer in self.network.read_buffer)
         steps += 1
         if ready or steps > max_steps:
             break
+    info['steps'] = steps
+
+    return None, info
 ''']
 
         async_train_methods = [
@@ -270,7 +276,7 @@ class Ruleset:
         self.initialize_rules = []
 
         for slot_value, slot_type in zip(slot_values, slot_types):
-            rule = Rule(ruleset=self, slot_type=slot_type, slot_value=slot_value, expression_complexity=self.sample_initialize_expression_complexity(slot_type), slot_filter_usage_frequency=0.0,  slot_conditional_usage_frequency=0.0, base_expression='leaves.zero()', expression_type='initialize')
+            rule = Rule(ruleset=self, slot_type=slot_type, slot_value=slot_value, expression_complexity=self.sample_initialize_expression_complexity(slot_type), slot_filter_usage_frequency=0.0,  slot_conditional_usage_frequency=0.0, base_expression=leaves.context_renderer(leaves.zero, 'initialize', leaf_type=slot_type), expression_type='initialize')
             rule.generate()
             self.initialize_rules.append(rule)
 
@@ -413,7 +419,6 @@ class ExpressionTree:
 
             # assertions make sure this node hasn't been somehow already initialized
             if number_children == 0:
-                node.slot_filter = None
                 # leaves never have a slot_filter, that way we are always selecting from the full filtered vector whenever accessing some memory
                 leaf_type = node.slot_type
                 if leaf_type is None:
@@ -423,6 +428,8 @@ class ExpressionTree:
                     node.operator = node.base_expression
                 else:
                     node.operator = leaves.sample_rendered_leaf(node.expression_type, leaf_type, self.node_memory_size, self.edge_memory_size)
+                if node.slot_filter is not None:
+                    node.operator = 'operators.apply_filter({expression}, slot_filter_{i})'.format(expression=node.operator, i=node.ruleset.filters.index(node.slot_filter))
             else:
                 is_reducer = None
                 if node.slot_type == 'float':

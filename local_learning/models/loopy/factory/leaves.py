@@ -64,14 +64,36 @@ leaf_sampler.append((gaussian, uniform))
 # leaves which don't take arguments/context
 ###############
 
-def one():return 1.0
-def zero():return 0.0
-def minus_one():return -1.0
-def two():return 2.0
-def minus_two():return -2.0
-def point_one():return 0.1
-def point_zero_one():return 0.01
-def point_zero_zero_one():return 0.001
+def constant_leaf(constant, context, leaf_type):
+    if leaf_type != 'vector':
+        return constant
+    leaf = np.zeros(context['edges'])
+    leaf[:] = constant
+    return leaf
+
+def one(context, leaf_type):
+    return constant_leaf(1.0, context, leaf_type)
+
+def zero(context, leaf_type):
+    return constant_leaf(0.0, context, leaf_type)
+
+def minus_one(context, leaf_type):
+    return constant_leaf(-1.0, context, leaf_type)
+
+def two(context, leaf_type):
+    return constant_leaf(2.0, context, leaf_type)
+
+def minus_two(context, leaf_type):
+    return constant_leaf(-2.0, context, leaf_type)
+
+def point_one(context, leaf_type):
+    return constant_leaf(0.1, context, leaf_type)
+
+def point_zero_one(context, leaf_type):
+    return constant_leaf(0.01, context, leaf_type)
+
+def point_zero_zero_one(context, leaf_type):
+    return constant_leaf(0.001, context, leaf_type)
 
 leaf_sampler.append(((one, zero, minus_one), (one, zero, minus_one, two, minus_two, point_one, point_zero_one, point_zero_zero_one)))
 
