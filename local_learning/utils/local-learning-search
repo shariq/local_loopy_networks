@@ -12,8 +12,9 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Run checks on loopy.factory sampled models.')
     parser.add_argument('--verbose', '-v', action='count', default=0)
     parser.add_argument('--quiet', '-q', action='store_true', default=False)
-    parser.add_argument('--slow', '-s', action='store_true', default=False)
-    parser.add_argument('--allow-exceptions', '-x', action='store_true', default=False)
+    parser.add_argument('--debug-exceptions', action='store_true', default=False)
+    parser.add_argument('--run-once', action='store_true', default=False)
+    parser.add_argument('--seed', type=int, default=None, help='random seed to use; defaults to None (helpful for debugging)')
 
     args = parser.parse_args()
 
@@ -27,8 +28,16 @@ if __name__ == '__main__':
     if args.quiet:
         logger.setLevel(logging.CRITICAL)
 
-    for _, code, results in search_harness(catch_exceptions=not args.allow_exceptions):
+    if args.seed is not None:
+        import numpy as np
+        import random
+        random.seed(args.seed)
+        np.random.seed(args.seed)
+
+    local_learning.debug_exceptions = args.debug_exceptions
+
+    for _, code, results in search_harness():
         total_score = sum(results) / len(results)
-        logger.info('{} got score {} with results {}'.format(code[:200].replace('\n', '\\n'), total_score, results))
-        if args.slow:
-            input()
+        logger.info('got score {} with results {}'.format(total_score, results))
+        if args.run_once:
+            break
