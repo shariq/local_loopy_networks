@@ -13,6 +13,8 @@ setup(
     version=VERSION,
     install_requires=[
         'numpy',
-        'scipy'
+        'scipy',
+        'psycopg2',
+        'sqlalchemy'
     ],
 )

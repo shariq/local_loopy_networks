@@ -45,7 +45,10 @@ if __name__ == '__main__':
     for harness_generator, harness_code, results in search_harness():
         average_score = sum(results) / len(results)
         logger.info('got score {} with results {}'.format(average_score, results))
+        if postgres_uri:
+            if average_score <= 0.5:
+                harness_generator = None
+                harness_code = ''
+            postgres.save(postgres_uri, score=average_score, code=harness_code, blob=harness_generator)
         if args.run_once:
             break
-        if postgres_uri:
-            postgres.save(postgres_uri, average_score, harness_code, harness_generator)

@@ -4,10 +4,12 @@ from sqlalchemy.dialects import postgresql
 import os
 import datetime
 
+import logging
+
 connection_metas = {}
 
 def initialize(postgres_uri):
-    connection = sqlalchemy(postgres_uri, client_encoding='utf8')
+    connection = sqlalchemy.create_engine(postgres_uri, client_encoding='utf8')
     meta = sqlalchemy.MetaData(bind=connection, reflect=True)
 
     if 'results' not in meta.tables:
@@ -19,14 +21,14 @@ def initialize(postgres_uri):
         )
 
         # Create the above tables
-        meta.create_all(con)
+        meta.create_all(connection)
 
     connection_metas[postgres_uri] = (connection, meta)
 
     return connection, meta
 
 def save(postgres_uri, score, code, blob):
-    if postgres_uri not in connection_metas or connection_metas[postgres_uri][0].closed:
+    if postgres_uri not in connection_metas:
         connection, meta = initialize(postgres_uri)
     connection, meta = connection_metas[postgres_uri]
     timestamp = datetime.datetime.now()
@@ -36,4 +38,8 @@ def save(postgres_uri, score, code, blob):
         code=code,
         blob=blob
     )
-    connection.execute(clause)
+    try:
+        connection.execute(clause)
+    except Exception as e:
+        initialize(postgres_uri)
+        logger.error(e, exc_info=True)

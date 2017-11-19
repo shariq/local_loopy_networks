@@ -51,7 +51,8 @@ class Model:
 
     def generate(self):
 
-        self.adjacency_dict = local_learning.graph.loopy.adjacency_dicts[0]  # random.choice(local_learning.graph.loopy.adjacency_dicts)
+        self.adjacency_dict = 'local_learning.graph.feedforward.make_feedforward_adjacency_dict(input_size=input_size, hidden_size=4, output_size=output_size, secondary_output_layer=False, layers=1)'
+        # random.choice(local_learning.graph.loopy.adjacency_dicts[:2])
 
         init_methods = [
 '''
@@ -176,6 +177,7 @@ import local_learning.graph.tools
 import local_learning.models.loopy.factory.operators as operators
 import local_learning.models.loopy.factory.leaves as leaves
 import local_learning.models.loopy
+import local_learning.graph.feedforward
 
 import logging
 logger = logging.getLogger()
@@ -197,31 +199,31 @@ class Ruleset:
     def sample_rules_per_slot(self, slot_type):
         assert slot_type in ['vector', 'float']
         if slot_type == 'vector':
-            return random.choice([1, 1, 1, 1, 1, 2, 2, 3, 4, 5])
+            return random.choice([1, 2, 3, 4, 5])
         if slot_type == 'float':
             return 1
     def sample_number_conditionals(self):
-        self.number_conditionals = random.choice(list(range(4, 7)) + list(range(2, 9)))
+        self.number_conditionals = random.choice(list(range(4, 7)))
         return self.number_conditionals
     def sample_conditional_complexities(self):
         if self.number_conditionals is None:
             raise Exception('must call sample_number_conditionals and assign self.number_conditionals before calling sample_conditional_complexities')
-        self.conditional_complexities = [random.choice(list(range(1,5)) + list(range(1,11))) for i in range(self.number_conditionals)]
+        self.conditional_complexities = [random.choice(list(range(1,5))*3 + list(range(1,11))) for i in range(self.number_conditionals)]
         return self.filter_complexities
     def sample_number_filters(self):
-        self.number_filters = random.choice(list(range(4, 7)) + list(range(2, 9)))
+        self.number_filters = random.choice(list(range(4, 7)))
         return self.number_filters
     def sample_filter_complexities(self):
         if self.number_filters is None:
             raise Exception('must call sample_number_filters and assign self.number_filters before calling sample_filter_complexities')
-        self.filter_complexities = [random.choice(list(range(1,5)) + list(range(1,11))) for i in range(self.number_filters)]
+        self.filter_complexities = [random.choice(list(range(1,5))*3 + list(range(1,11))) for i in range(self.number_filters)]
         return self.filter_complexities
     def sample_step_expression_complexity(self, slot_type):
         assert slot_type in ['vector', 'float']
         if slot_type == 'vector':
-            return random.choice(list(range(2,6)) + list(range(5,11))*3 + list(range(5,21))*2 + list(range(5,31)))
+            return random.choice(list(range(2, 6))*5 + list(range(6, 10)))
         if slot_type == 'float':
-            return random.choice(list(range(2,6)) + list(range(5,11))*3)
+            return random.choice(list(range(2, 6))*10 + list(range(6,10)))
     def sample_initialize_expression_complexity(self, slot_type):
         assert slot_type in ['vector', 'float']
         return random.choice([1, 2, 3])

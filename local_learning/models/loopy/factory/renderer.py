@@ -114,10 +114,6 @@ except Exception as e:
 
         rendered_code += self.render_expression_tree(rule.expression_tree)
 
-        if rule.expression_tree.slot_filter != rule.slot_filter:
-            print("AHHHHHHHHHH")
-            import pdb ; pdb.set_trace()
-
         return rendered_code
 
 
