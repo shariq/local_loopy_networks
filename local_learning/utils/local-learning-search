@@ -3,18 +3,22 @@
 import argparse
 import local_learning
 import logging
+import datetime
+import os
 
 logger = logging.getLogger()
 
 from local_learning.models.loopy.search import search_harness
+from local_learning.models.loopy import postgres
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Run checks on loopy.factory sampled models.')
     parser.add_argument('--verbose', '-v', action='count', default=0)
-    parser.add_argument('--quiet', '-q', action='store_true', default=False)
-    parser.add_argument('--debug-exceptions', action='store_true', default=False)
+    parser.add_argument('--quiet', '-q', action='store_true', default=False, help='Don\'t even log errors.')
+    parser.add_argument('--debug-exceptions', action='store_true', default=False, help='Don\'t ignore exceptions so they can be debugged.')
     parser.add_argument('--run-once', action='store_true', default=False)
-    parser.add_argument('--seed', type=int, default=None, help='random seed to use; defaults to None (helpful for debugging)')
+    parser.add_argument('--seed', type=int, default=None, help='Random seed to use; defaults to None (helpful for debugging).')
+    parser.add_argument('--postgres', type=str, default=None, help='Log results to this postgres database. Can also pass as environment variable.')
 
     args = parser.parse_args()
 
@@ -36,8 +40,12 @@ if __name__ == '__main__':
 
     local_learning.debug_exceptions = args.debug_exceptions
 
-    for _, code, results in search_harness():
-        total_score = sum(results) / len(results)
-        logger.info('got score {} with results {}'.format(total_score, results))
+    postgres_uri = args.postgres or os.environ.get('PG_URI', None)
+
+    for harness_generator, harness_code, results in search_harness():
+        average_score = sum(results) / len(results)
+        logger.info('got score {} with results {}'.format(average_score, results))
         if args.run_once:
             break
+        if postgres_uri:
+            postgres.save(postgres_uri, average_score, harness_code, harness_generator)

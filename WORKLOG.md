@@ -1,3 +1,7 @@
+# November 18, 2017
+
+Started working at Scale, so didn't have much time recently. But all the bugs are fixed and now we need to improve defaults, and make the code faster. Today I'll get this running on some droplets.
+
 # November 8, 2017
 
 I'm starting to be more OK with just working a lot at a consistent pace without being super productive. Maybe the path to being super productive is accept where I'm at now, and push incrementally to be more focused.
