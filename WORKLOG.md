@@ -2,6 +2,20 @@
 
 Started working at Scale, so didn't have much time recently. But all the bugs are fixed and now we need to improve defaults, and make the code faster. Today I'll get this running on some droplets.
 
+Got code running on some droplets, dumping results to postgres. Potential next steps:
+- shared vs nonshared edge memory
+- edge parity
+- default filters and conditionals
+- get backprop working (so we test that rule rendering is behaving sanely; try to hit rule rendering code paths here)
+- write complexity decreaser and evolver for use with backprop
+- write better tests, which resolve faster
+- include more things in pg log - train time, scores for all tests.
+- improve performance (not sure why running such a simple model is so slow right now)
+- scale up a bit: make sure to first make this cost effective by benchmarking across a few different cloud providers, and checking for D.O. which droplets are most cost efficient.
+- long term: dashboard to monitor performance, pool of models to evolve, interactive evolution with dashboard that lets you modify hyperparams and fork (keeps track of full tree of changes), more reuse in expression trees, ...
+- crazy ideas: symmetric error/signal, reinforcement learning, reimplement on GPU, somehow get access to 10k+ cores, make code run asynchronously on a GPU, reimplement slow parts in C/C++,
+- to get RL/weird SL structure to work, we need to try and have a similarly working curriculum for supervised learning from scratch, without starting from backprop.
+
 # November 8, 2017
 
 I'm starting to be more OK with just working a lot at a consistent pace without being super productive. Maybe the path to being super productive is accept where I'm at now, and push incrementally to be more focused.
