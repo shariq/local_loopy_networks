@@ -1,3 +1,19 @@
+# January 14, 2017
+
+Have been working at Scale for 2 months now. It's so great. So much potential and feel like I'm becoming way better at doing stuff.
+
+First time I've touched this codebase since the last update. Took a look at some running experiments and fixed bug which caused successful learning rules not to be stored (derp). 
+
+Some sober next steps for this project (modified from last time):
+- make the renderer dump C/C++ vectorized code to be fast (*not* GPU code! that's too expensive on da cl0ud)
+- shared vs nonshared edge memory
+- default filters and conditionals
+- evolutionary / genetic style algorithms; actually have pool of rules and use high scoring rules, instead of random each time
+- make the tests better so bad rules fail faster, without requiring running for so long
+- get some cloud credits
+- run on 10 machines instead of 1
+- crazy ideas: test generator using random circuits, RL/SL with merged error+signal, cool visualizations, way more tests
+
 # November 18, 2017
 
 Started working at Scale, so didn't have much time recently. But all the bugs are fixed and now we need to improve defaults, and make the code faster. Today I'll get this running on some droplets.
