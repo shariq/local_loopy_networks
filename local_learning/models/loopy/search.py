@@ -43,7 +43,7 @@ def sample_factory_model_class():
     return generator_harness, harness_code, model_class
 
 
-def search_harness(model_class_sampler=sample_factory_model_class, limit=None):
+def search_harness(model_class_sampler=sample_factory_model_class, limit=None, hardcoded_results=None):
     iterations = 0
     while True:
         if limit is not None and iterations >= limit:
@@ -51,21 +51,24 @@ def search_harness(model_class_sampler=sample_factory_model_class, limit=None):
         try:
             generator_harness, harness_code, model_class = model_class_sampler()
             results = [0.0] * len(all_checks)
-            for check_index, check, accuracy_requirement in zip(range(len(all_checks)), all_checks, all_checks_accuracy_requirements):
-                try:
-                    check_accuracy = check(model_class)
-                    results[check_index] = check_accuracy
-                    if check_accuracy < accuracy_requirement:
-                        break
-                except Exception as e:
-                    logger.error(e, exc_info=True)
-                    if debug_exceptions:
-                        import pdb ; pdb.set_trace()
-                        raise
-                    else:
-                        break
-            iterations += 1
-            yield generator_harness, harness_code, results
+            if hardcoded_results:
+                yield generator_harness, harness_code, results
+            else:
+                for check_index, check, accuracy_requirement in zip(range(len(all_checks)), all_checks, all_checks_accuracy_requirements):
+                    try:
+                        check_accuracy = check(model_class)
+                        results[check_index] = check_accuracy
+                        if check_accuracy < accuracy_requirement:
+                            break
+                    except Exception as e:
+                        logger.error(e, exc_info=True)
+                        if debug_exceptions:
+                            import pdb ; pdb.set_trace()
+                            raise
+                        else:
+                            break
+                iterations += 1
+                yield generator_harness, harness_code, results
         except Exception as e:
             iterations += 1
             logger.error(e, exc_info=True)

@@ -4,7 +4,7 @@ import logging
 logger = logging.getLogger()
 handler = logging.StreamHandler(sys.stdout)
 handler.setLevel(logging.DEBUG)
-formatter = logging.Formatter("[%(asctime)s.%(msecs)03d] %(message)s", "%H:%M:%S")
+formatter = logging.Formatter("[%(asctime)s.%(msecs)03d] %(message)s", "%Y-%m-%d %H:%M:%S")
 handler.setFormatter(formatter)
 logger.addHandler(handler)
 

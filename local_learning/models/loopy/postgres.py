@@ -1,11 +1,13 @@
 import sqlalchemy
-from sqlalchemy import Table, Column, Integer, String, Float, PickleType, DateTime
+from sqlalchemy import Table, Column, Integer, String, Float, Binary, DateTime
 from sqlalchemy.dialects import postgresql
 import os
 import datetime
+import pickle
 
 import logging
 
+logger = logging.getLogger()
 connection_metas = {}
 
 def initialize(postgres_uri):
@@ -17,7 +19,7 @@ def initialize(postgres_uri):
             Column('timestamp', DateTime),
             Column('score', Float),
             Column('code', String),
-            Column('blob', PickleType)
+            Column('blob', Binary)
         )
 
         # Create the above tables
@@ -36,7 +38,7 @@ def save(postgres_uri, score, code, blob):
         timestamp=timestamp,
         score=score,
         code=code,
-        blob=blob
+        blob=pickle.dumps(blob)
     )
     try:
         connection.execute(clause)
