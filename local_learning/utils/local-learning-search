@@ -43,7 +43,7 @@ if __name__ == '__main__':
 
     postgres_uri = args.postgres or os.environ.get('PG_URI', None)
 
-    hardcoded_results = None if not args.test_postgres else [-1.0]
+    hardcoded_results = args.test_postgres
 
     for harness_generator, harness_code, results in search_harness(hardcoded_results=hardcoded_results):
         average_score = sum(results) / len(results)
