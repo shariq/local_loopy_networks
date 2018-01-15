@@ -43,7 +43,7 @@ def sample_factory_model_class():
     return generator_harness, harness_code, model_class
 
 
-def search_harness(model_class_sampler=sample_factory_model_class, limit=None, hardcoded_results=None):
+def search_harness(model_class_sampler=sample_factory_model_class, limit=None, hardcoded_results=False):
     iterations = 0
     while True:
         if limit is not None and iterations >= limit:
