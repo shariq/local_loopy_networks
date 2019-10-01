@@ -1,0 +1,49 @@
+#!/usr/bin/env python3
+
+import argparse
+import local_learning
+import logging
+import datetime
+import os
+
+logger = logging.getLogger()
+
+from local_learning.models.loopy.search import compile_model
+from local_learning.models.loopy.checks import all_checks, all_checks_accuracy_requirements
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='Run checks on a single loopy.factory model; print out lots of debug info.')
+    parser.add_argument('--debug-exceptions', action='store_true', default=False, help='Don\'t ignore exceptions so they can be debugged.')
+    parser.add_argument('--model-path', required=True, type=str, help='Path to the model code.')
+    parser.add_argument('--seed', type=int, default=None, help='Random seed to use; defaults to None (helpful for debugging).')
+    parser.add_argument('--check-index', type=int, default=None, help='Which check to do (leave as None to do all checks).')
+
+    args = parser.parse_args()
+
+    logger.setLevel(logging.DEBUG)
+
+    if args.seed is not None:
+        import numpy as np
+        import random
+        random.seed(args.seed)
+        np.random.seed(args.seed)
+
+    local_learning.debug_exceptions = args.debug_exceptions
+
+    model_code = open(args.model_path).read()
+    model_class = compile_model(model_code)
+
+    for check_index, check, accuracy_requirement in zip(range(len(all_checks)), all_checks, all_checks_accuracy_requirements):
+        try:
+            if args.check_index is not None and check_index != args.check_index:
+                continue
+            logger.debug('running check {}'.format(check))
+            check_accuracy = check(model_class)
+            logger.debug('got accuracy {}'.format(check_accuracy))
+        except Exception as e:
+            logger.error(e, exc_info=True)
+            if debug_exceptions:
+                import pdb ; pdb.set_trace()
+                raise
+            else:
+                break

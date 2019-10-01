@@ -29,7 +29,11 @@ def check_basic_function(harness_class, train_dataset):
     harness = harness_class(input_size=input_size, output_size=output_size)
 
     iterations = 20 * len(train_dataset) * (output_size + input_size)
+    logger.debug('beginning training... total {} iterations'.format(iterations))
+
     harness.train(dataset=train_dataset, iterations=iterations)
+
+    logger.debug('completed training. beginning test...')
 
     number_correct_examples = 0
 
